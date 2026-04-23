@@ -14,10 +14,14 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-ink-50">
-      <AdminSidebar />
+      {/* Desktop stays exactly the same */}
+      <div className="hidden lg:block">
+        <AdminSidebar />
+      </div>
+
       <div className="lg:pl-64">
         <AdminTopbar user={user} />
-        <main className="px-5 sm:px-8 pb-16 pt-4">{children}</main>
+        <main className="px-4 sm:px-5 lg:px-8 pb-16 pt-4">{children}</main>
       </div>
     </div>
   );

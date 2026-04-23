@@ -24,60 +24,77 @@ export default async function AdminHome() {
   ];
 
   return (
-    <div className="pt-6 space-y-5">
+    <div className="pt-4 sm:pt-6 space-y-4 sm:space-y-5">
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-ink-900">Overview</h1>
-        <p className="text-[13.5px] text-ink-500 mt-1">
+        <h1 className="text-[24px] sm:text-[28px] font-bold tracking-tight text-ink-900">
+          Overview
+        </h1>
+        <p className="text-[13px] sm:text-[13.5px] text-ink-500 mt-1">
           Everything that needs your attention, in one place.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3">
         {KPIS.map((k) => (
           <Link
             key={k.label}
             href={k.href}
-            className="card p-5 hover:shadow-pop transition"
+            className="card p-4 sm:p-5 hover:shadow-pop transition"
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-ink-500">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] sm:text-[11.5px] font-semibold uppercase tracking-[0.14em] text-ink-500">
                 {k.label}
               </span>
-              <k.Icon className={`h-4 w-4 ${k.accent ? "text-amber-600" : "text-ink-400"}`} />
+              <k.Icon className={`h-4 w-4 shrink-0 ${k.accent ? "text-amber-600" : "text-ink-400"}`} />
             </div>
-            <div className="mt-2 text-[34px] font-bold text-ink-900 tracking-tight">
+            <div className="mt-2 text-[28px] sm:text-[34px] font-bold text-ink-900 tracking-tight break-words">
               {k.value}
             </div>
           </Link>
         ))}
       </div>
 
-      <div className="card p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-semibold text-ink-900">Latest transfers</h2>
-          <Link href="/admin/transfers" className="text-[13px] font-semibold text-ink-700 hover:underline">
+      <div className="card p-4 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[16px] sm:text-[17px] font-semibold text-ink-900">
+            Latest transfers
+          </h2>
+          <Link
+            href="/admin/transfers"
+            className="text-[12.5px] sm:text-[13px] font-semibold text-ink-700 hover:underline shrink-0"
+          >
             See all
           </Link>
         </div>
+
         <ul className="mt-4 divide-y divide-ink-100">
           {(recentTransfers || []).map((t) => (
-            <li key={t.id} className="py-3 flex items-center gap-4">
+            <li
+              key={t.id}
+              className="py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+            >
               <div className="flex-1 min-w-0">
-                <div className="text-[14px] font-semibold text-ink-900 truncate">
+                <div className="text-[14px] font-semibold text-ink-900 break-words sm:truncate">
                   {t.reference_id} · {t.beneficiary_name}
                 </div>
-                <div className="text-[11.5px] text-ink-400">
+                <div className="text-[11.5px] text-ink-400 break-words">
                   {fmtRelativeDate(t.created_at)} · {t.rail}
                 </div>
               </div>
-              <div className="text-[14px] font-bold text-ink-900 tabular-nums">
-                {fmtMoney(Number(t.amount))}
+
+              <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4">
+                <div className="text-[14px] font-bold text-ink-900 tabular-nums">
+                  {fmtMoney(Number(t.amount))}
+                </div>
+                <StatusPill status={t.status} />
               </div>
-              <StatusPill status={t.status} />
             </li>
           ))}
+
           {(recentTransfers || []).length === 0 && (
-            <li className="py-6 text-center text-[13.5px] text-ink-400">No transfers yet.</li>
+            <li className="py-6 text-center text-[13.5px] text-ink-400">
+              No transfers yet.
+            </li>
           )}
         </ul>
       </div>
@@ -93,9 +110,13 @@ function StatusPill({ status }: { status: string }) {
     rejected: { bg: "bg-red-100", text: "text-red-700", label: "Rejected" },
     canceled: { bg: "bg-ink-100", text: "text-ink-700", label: "Canceled" },
   };
+
   const s = map[status] || { bg: "bg-ink-100", text: "text-ink-700", label: status };
+
   return (
-    <span className={`inline-flex items-center rounded-full ${s.bg} ${s.text} text-[10.5px] font-bold uppercase tracking-wide px-2 py-0.5 shrink-0`}>
+    <span
+      className={`inline-flex items-center rounded-full ${s.bg} ${s.text} text-[10.5px] font-bold uppercase tracking-wide px-2 py-0.5 shrink-0`}
+    >
       {s.label}
     </span>
   );
