@@ -134,7 +134,7 @@ export function Hero() {
               >
                 CHANGE THE WAY <br />
                 <span className="bg-gradient-to-r from-white via-azure-400 to-brand-400 bg-clip-text text-transparent">
-                  YOU MONEY
+                  YOU MANAGE MONEY
                 </span>
               </motion.h1>
 
