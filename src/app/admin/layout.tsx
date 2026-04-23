@@ -14,13 +14,23 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-ink-50">
-      {/* Desktop stays exactly the same */}
+      {/* Desktop sidebar: unchanged */}
       <div className="hidden lg:block">
         <AdminSidebar />
       </div>
 
       <div className="lg:pl-64">
         <AdminTopbar user={user} />
+
+        {/* Mobile sidebar/nav visible */}
+        <div className="lg:hidden border-b border-ink-100 bg-white">
+          <div className="overflow-x-auto">
+            <div className="min-w-max">
+              <AdminSidebar />
+            </div>
+          </div>
+        </div>
+
         <main className="px-4 sm:px-5 lg:px-8 pb-16 pt-4">{children}</main>
       </div>
     </div>
