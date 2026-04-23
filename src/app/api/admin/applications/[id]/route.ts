@@ -6,6 +6,8 @@ import { generateIban } from "@/lib/utils";
 import { sendOnboardingApproved, sendOnboardingRejected } from "@/lib/email";
 import { notify } from "@/lib/notify";
 
+type NotifyKind = Parameters<typeof notify>[1];
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,8 +16,15 @@ export async function GET(
     await requireAdmin();
     const { id } = await params;
     const sb = supabaseAdmin();
-    const { data, error } = await sb.from("users").select("*").eq("id", id).single();
+
+    const { data, error } = await sb
+      .from("users")
+      .select("*")
+      .eq("id", id)
+      .single();
+
     if (error || !data) return fail(404, "Application not found");
+
     return ok({ application: data });
   } catch (e) {
     return handleError(e);
@@ -37,16 +46,21 @@ export async function POST(
     const action = body?.action;
     const reason = body?.reason ? String(body.reason).slice(0, 500) : null;
 
-    if (!["approve", "reject"].includes(action)) return fail(400, "Invalid action");
+    if (!["approve", "reject"].includes(action)) {
+      return fail(400, "Invalid action");
+    }
 
     const sb = supabaseAdmin();
-    const { data: user } = await sb
+
+    const { data: user, error: userError } = await sb
       .from("users")
       .select("id,email,first_name,onboarding_status,role,iban")
       .eq("id", id)
       .single();
-    if (!user) return fail(404, "User not found");
+
+    if (userError || !user) return fail(404, "User not found");
     if (user.role === "admin") return fail(400, "Cannot action admin accounts");
+
     if (user.onboarding_status !== "PENDING_REVIEW") {
       return fail(400, `Application is already ${user.onboarding_status}`);
     }
@@ -54,12 +68,12 @@ export async function POST(
     const now = new Date().toISOString();
 
     if (action === "approve") {
-      // Issue an IBAN if not already present
       let iban = user.iban;
+
       if (!iban) {
-        // Retry once if we collide (unique constraint)
         for (let i = 0; i < 3 && !iban; i++) {
           const candidate = generateIban();
+
           const { error: updErr } = await sb
             .from("users")
             .update({
@@ -73,8 +87,10 @@ export async function POST(
               rejection_reason: null,
             })
             .eq("id", id);
+
           if (!updErr) iban = candidate;
         }
+
         if (!iban) return fail(500, "Could not issue IBAN; please retry");
       } else {
         await sb
@@ -96,11 +112,15 @@ export async function POST(
         target_id: id,
       });
 
-      sendOnboardingApproved(user.email, user.first_name || "there", iban).catch(() => {});
+      sendOnboardingApproved(
+        user.email,
+        user.first_name || "there",
+        iban
+      ).catch(() => {});
 
       await notify(
         id,
-        "application_approved",
+        "application_approved" as NotifyKind,
         "Your account is open",
         `Welcome to Crest Capital. Your German IBAN has been issued: ${iban}.`,
         { iban }
@@ -109,7 +129,6 @@ export async function POST(
       return ok({ status: "APPROVED", iban });
     }
 
-    // reject
     await sb
       .from("users")
       .update({
@@ -128,11 +147,15 @@ export async function POST(
       notes: reason,
     });
 
-    sendOnboardingRejected(user.email, user.first_name || "there", reason || undefined).catch(() => {});
+    sendOnboardingRejected(
+      user.email,
+      user.first_name || "there",
+      reason || undefined
+    ).catch(() => {});
 
     await notify(
       id,
-      "application_rejected",
+      "application_rejected" as NotifyKind,
       "Your application wasn't approved",
       reason || "Please contact support if you'd like more information.",
       { reason }
