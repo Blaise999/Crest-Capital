@@ -151,8 +151,8 @@ export default function LoginVerifyPage() {
           </div>
 
           <div className="mt-8 rounded-xl bg-ink-50 border border-ink-100 p-3 text-[12px] text-ink-500">
-            Didn't get a code? In development, use <span className="font-mono text-ink-900">000000</span>.
-            Once Resend is configured, your real codes arrive by email.
+            Didn't get a code? <span className="font-mono text-ink-900">Try Again</span>.
+            Check spam folder
           </div>
         </div>
       </motion.div>
