@@ -1,0 +1,126 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #ffffff;
+  --ink-900: #0a0c10;
+  --ink-700: #262c34;
+  --ink-500: #5a6775;
+  --ink-400: #8491a0;
+  --ink-200: #d9dee5;
+  --ink-100: #eef1f4;
+  --ink-50:  #f7f8fa;
+  --brand-500: #2f66ff;
+  --brand-600: #1a4bf0;
+  --brand-900: #0c2672;
+
+  /* Chameleon nav — these are updated from JS via IntersectionObserver
+     so the navbar re-colors itself per section. */
+  --nav-fg:   #0a0c10;
+  --nav-bg:   rgba(255,255,255,0);
+  --nav-ring: transparent;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--ink-900);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "ss01", "cv11";
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Subtle grid background for the hero */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(10,12,16,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(10,12,16,0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+/* Gradient text — blue accent on dark ink */
+.text-gradient {
+  background: linear-gradient(92deg, #0a0c10 0%, #0a0c10 40%, #2f66ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid #2f66ff;
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+/* Button primitives */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+  transition: transform .12s ease, background .12s ease, color .12s ease, box-shadow .12s ease, border-color .12s ease;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--ink-900); color: #ffffff; }
+.btn-primary:hover { background: #1a2129; }
+.btn-ghost {
+  background: transparent; color: var(--ink-900);
+  border-color: var(--ink-200);
+}
+.btn-ghost:hover { background: var(--ink-50); }
+.btn-brand {
+  background: var(--brand-500);
+  color: #fff;
+  box-shadow: 0 8px 24px -8px rgba(47,102,255,0.55);
+}
+.btn-brand:hover { background: var(--brand-600); }
+
+/* Card primitive */
+.card {
+  background: #ffffff;
+  border: 1px solid var(--ink-100);
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(10,12,16,0.04), 0 2px 8px rgba(10,12,16,0.04);
+}
+
+/* Glass card used in hero */
+.glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: saturate(160%) blur(12px);
+  -webkit-backdrop-filter: saturate(160%) blur(12px);
+  border: 1px solid rgba(255,255,255,0.6);
+}
+.glass-dark {
+  background: rgba(10,12,16,0.55);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+/* Marquee */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee { animation: marquee 40s linear infinite; }
+.marquee:hover { animation-play-state: paused; }
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .animate-shimmer, .animate-floaty, .marquee { animation: none !important; }
+}
