@@ -12,6 +12,7 @@ export type SessionUser = {
   role: "user" | "admin";
   first_name: string | null;
   last_name: string | null;
+  avatar_url: string | null;
   blocked: boolean;
 };
 
@@ -37,11 +38,17 @@ export function signSession(user: { id: string; role: "user" | "admin" }) {
   );
 }
 
-export function verifySession(token: string): { sub: string; role: "user" | "admin" } | null {
+export function verifySession(
+  token: string
+): { sub: string; role: "user" | "admin" } | null {
   try {
     const p = jwt.verify(token, jwtSecret()) as any;
     if (!p?.sub) return null;
-    return { sub: String(p.sub), role: p.role === "admin" ? "admin" : "user" };
+
+    return {
+      sub: String(p.sub),
+      role: p.role === "admin" ? "admin" : "user",
+    };
   } catch {
     return null;
   }
@@ -55,6 +62,7 @@ async function cookieStore() {
 
 export async function setSessionCookie(token: string) {
   const c = await cookieStore();
+
   c.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -78,23 +86,39 @@ export async function getSessionToken() {
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = await getSessionToken();
   if (!token) return null;
+
   const payload = verifySession(token);
   if (!payload) return null;
 
   const sb = supabaseAdmin();
+
   const { data, error } = await sb
     .from("users")
-    .select("id,email,role,first_name,last_name,blocked")
+    .select("id,email,role,first_name,last_name,avatar_url,blocked")
     .eq("id", payload.sub)
     .single();
+
   if (error || !data) return null;
-  return data as SessionUser;
+
+  return {
+    id: data.id,
+    email: data.email,
+    role: data.role === "admin" ? "admin" : "user",
+    first_name: data.first_name ?? null,
+    last_name: data.last_name ?? null,
+    avatar_url: data.avatar_url ?? null,
+    blocked: Boolean(data.blocked),
+  };
 }
 
 /** Require a user session; throws 401-style object when missing. */
 export async function requireUser() {
   const u = await getCurrentUser();
-  if (!u) throw new AuthError(401, "Not authenticated");
+
+  if (!u) {
+    throw new AuthError(401, "Not authenticated");
+  }
+
   return u;
 }
 
@@ -104,24 +128,31 @@ export async function requireUser() {
  */
 export async function requireActiveUser() {
   const u = await requireUser();
+
   if (u.blocked) {
     throw new AuthError(
       403,
       "This account has been flagged. Please contact support at support@crestcapital.com for assistance."
     );
   }
+
   return u;
 }
 
 /** Require admin. */
 export async function requireAdmin() {
   const u = await requireUser();
-  if (u.role !== "admin") throw new AuthError(403, "Admin only");
+
+  if (u.role !== "admin") {
+    throw new AuthError(403, "Admin only");
+  }
+
   return u;
 }
 
 export class AuthError extends Error {
   status: number;
+
   constructor(status: number, message: string) {
     super(message);
     this.status = status;

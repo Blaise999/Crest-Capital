@@ -56,20 +56,33 @@ export function DashTopbar({ user }: { user: SessionUser }) {
           Send money
         </Link>
 
-        <button className="hidden sm:inline-flex h-10 w-10 grid place-items-center rounded-full hover:bg-ink-50 focus-ring" onClick={() => {}} hidden />
-
         <NotificationsBell />
 
         <div
           className={cx(
-            "h-10 w-10 rounded-full grid place-items-center text-[13px] font-bold text-white"
+            "h-10 w-10 rounded-full overflow-hidden grid place-items-center text-[13px] font-bold text-white shrink-0"
           )}
-          style={{
-            background: `linear-gradient(135deg, hsl(${hue(user.id)} 60% 45%), hsl(${(hue(user.id) + 40) % 360} 60% 35%))`,
-          }}
+          style={
+            user.avatar_url
+              ? undefined
+              : {
+                  background: `linear-gradient(135deg, hsl(${hue(
+                    user.id
+                  )} 60% 45%), hsl(${(hue(user.id) + 40) % 360} 60% 35%))`,
+                }
+          }
           title={user.email}
         >
-          {initials(user)}
+          {user.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.avatar_url}
+              alt={user.email || "User avatar"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials(user)
+          )}
         </div>
 
         <button
@@ -83,7 +96,14 @@ export function DashTopbar({ user }: { user: SessionUser }) {
 
       {mobileOpen && (
         <nav className="lg:hidden border-t border-ink-100 bg-white px-3 py-3 space-y-1">
-          {["/dashboard", "/dashboard/transactions", "/dashboard/transfer", "/dashboard/spaces", "/dashboard/cards", "/dashboard/settings"].map((href) => (
+          {[
+            "/dashboard",
+            "/dashboard/transactions",
+            "/dashboard/transfer",
+            "/dashboard/spaces",
+            "/dashboard/cards",
+            "/dashboard/settings",
+          ].map((href) => (
             <Link
               key={href}
               href={href}
@@ -92,10 +112,16 @@ export function DashTopbar({ user }: { user: SessionUser }) {
             >
               {href === "/dashboard"
                 ? "Overview"
-                : href.replace("/dashboard/", "").replace(/^\w/, (c) => c.toUpperCase())}
+                : href
+                    .replace("/dashboard/", "")
+                    .replace(/^\w/, (c) => c.toUpperCase())}
             </Link>
           ))}
-          <button onClick={logout} className="w-full text-left rounded-xl px-4 py-2.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50">
+
+          <button
+            onClick={logout}
+            className="w-full text-left rounded-xl px-4 py-2.5 text-[14px] font-medium text-ink-700 hover:bg-ink-50"
+          >
             Log out
           </button>
         </nav>
