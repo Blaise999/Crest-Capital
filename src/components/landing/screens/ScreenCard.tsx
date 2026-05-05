@@ -12,7 +12,7 @@ export function ScreenCard() {
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-1.5">
             <span className="h-4 w-4 rounded-sm bg-brand-500/90" />
-            <span className="text-[10px] font-semibold tracking-wide">N-BANK</span>
+            <span className="text-[10px] font-semibold tracking-wide">CREST CAPITAL</span>
           </div>
           <Infinit className="h-4 w-4 text-white/70" />
         </div>

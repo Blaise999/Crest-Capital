@@ -20,7 +20,8 @@ export async function POST(req: NextRequest) {
     if (user && user.role === "user") {
       const code = generateOtp();
       await storeOtp(user.email, code, "password_reset");
-      sendOtp(user.email, code, "password_reset").catch(() => {});
+      // Awaited on purpose — user is waiting on the code.
+      await sendOtp(user.email, code, "password_reset");
     }
     return ok({ sent: true });
   } catch (e) {

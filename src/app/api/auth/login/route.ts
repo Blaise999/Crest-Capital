@@ -32,9 +32,12 @@ export async function POST(req: NextRequest) {
     // Blocked users CAN sign in — the dashboard is read-only when blocked.
 
     // Generate & store OTP, email it.
+    // We `await` here on purpose: the user is staring at a "code sent" screen,
+    // so we'd rather take ~300ms now than risk the serverless runtime freezing
+    // a fire-and-forget Promise mid-flight.
     const code = generateOtp();
     await storeOtp(user.email, code, "login");
-    sendOtp(user.email, code, "login").catch(() => {});
+    await sendOtp(user.email, code, "login");
 
     return ok({ next: "/login/verify", emailMasked: maskEmail(user.email) });
   } catch (e) {

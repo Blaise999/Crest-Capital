@@ -64,7 +64,7 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-[28px] font-bold tracking-tight text-ink-900">Users</h1>
           <p className="text-[13.5px] text-ink-500 mt-1">
-            Everyone with an Crest Capital account. Block / unblock and see their activity.
+            Everyone with a Crest Capital account. Block / unblock and see their activity.
           </p>
         </div>
       </div>

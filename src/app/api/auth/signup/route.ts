@@ -79,8 +79,11 @@ export async function POST(req: NextRequest) {
 
     // Welcome email only — the notifications bell stays empty until there's
     // actual activity (admin approval, transfers, admin-seeded transactions, etc.)
-    const { sendWelcome } = await import("@/lib/email");
-    sendWelcome(data.email, data.first_name || "there").catch(() => {});
+    // deferEmail() uses Next's after() so the runtime keeps the function alive
+    // long enough to actually send the mail (the old fire-and-forget pattern
+    // could be paused by the Lambda freeze and end up sending 20+ minutes late).
+    const { sendWelcome, deferEmail } = await import("@/lib/email");
+    deferEmail(() => sendWelcome(data.email, data.first_name || "there"));
 
     return ok({ user: data });
   } catch (e) {

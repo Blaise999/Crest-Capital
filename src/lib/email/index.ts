@@ -10,8 +10,10 @@ import {
   otpTemplate,
   onboardingApprovedTemplate,
   onboardingRejectedTemplate,
+  transactionPostedTemplate,
   type TransferEmailPayload,
   type ReceiptPayload,
+  type TransactionPostedPayload,
 } from "./templates";
 
 export function getResend() {
@@ -35,6 +37,52 @@ async function send(to: string, subject: string, html: string) {
     console.warn("[email] send failed:", e?.message || e);
     return { ok: false, error: String(e?.message || e) };
   }
+}
+
+/**
+ * Run an email send AFTER the HTTP response is returned, but guarantee that the
+ * serverless runtime stays alive long enough to complete it.
+ *
+ * Why this exists: the previous pattern was `sendX(...).catch(() => {})` — a
+ * fire-and-forget Promise. On Vercel / Lambda style hosts the function freezes
+ * the moment the response is sent, so those promises pause mid-flight and only
+ * resume when the same container is reused (can be 20+ minutes apart on low
+ * traffic). `after()` tells Next to keep the invocation alive until the work
+ * settles, which is what we actually want.
+ */
+export function deferEmail(task: () => Promise<unknown>) {
+  // Lazy require so this file still works in non-Next contexts (tests, scripts).
+  let after:
+    | ((cb: () => unknown | Promise<unknown>) => void)
+    | undefined;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require("next/server") as Record<string, unknown>;
+    after =
+      (mod.after as typeof after) ||
+      (mod.unstable_after as typeof after);
+  } catch {
+    after = undefined;
+  }
+
+  const wrapped = async () => {
+    try {
+      await task();
+    } catch (e: any) {
+      console.warn("[email] deferred send failed:", e?.message || e);
+    }
+  };
+
+  if (typeof after === "function") {
+    try {
+      after(wrapped);
+      return;
+    } catch {
+      // after() can throw if called outside a request scope — fall through.
+    }
+  }
+  // Fallback: plain fire-and-forget. Better than nothing in dev / scripts.
+  void wrapped();
 }
 
 export async function sendWelcome(to: string, firstName: string) {
@@ -69,4 +117,11 @@ export async function sendOnboardingApproved(to: string, firstName: string, iban
 }
 export async function sendOnboardingRejected(to: string, firstName: string, reason?: string) {
   return send(to, "Your Crest Capital application", onboardingRejectedTemplate({ firstName, reason }));
+}
+export async function sendTransactionPosted(to: string, p: TransactionPostedPayload) {
+  const subject =
+    p.direction === "credit"
+      ? `You received ${p.amountFmt}`
+      : `${p.amountFmt} debited from your account`;
+  return send(to, subject, transactionPostedTemplate(p));
 }

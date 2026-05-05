@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ok, fail, handleError } from "@/lib/http";
-import { sendTransferRejected } from "@/lib/email";
+import { sendTransferRejected, deferEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 import { fmtMoney } from "@/lib/utils";
 
@@ -61,15 +61,17 @@ export async function POST(
     });
 
     if (sender) {
-      sendTransferRejected(sender.email, {
-        firstName: sender.first_name || "there",
-        reference: transfer.reference_id,
-        amount: Number(transfer.amount),
-        currency: transfer.currency,
-        beneficiaryName: transfer.beneficiary_name,
-        rail: transfer.rail,
-        reason: reason || undefined,
-      }).catch(() => {});
+      deferEmail(() =>
+        sendTransferRejected(sender.email, {
+          firstName: sender.first_name || "there",
+          reference: transfer.reference_id,
+          amount: Number(transfer.amount),
+          currency: transfer.currency,
+          beneficiaryName: transfer.beneficiary_name,
+          rail: transfer.rail,
+          reason: reason || undefined,
+        })
+      );
 
       await notify(
         transfer.user_id,

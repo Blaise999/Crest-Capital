@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ok, fail, handleError } from "@/lib/http";
-import { sendAccountBlocked, sendAccountUnblocked } from "@/lib/email";
+import { sendAccountBlocked, sendAccountUnblocked, deferEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 
 /**
@@ -49,7 +49,9 @@ export async function POST(
     });
 
     if (block) {
-      sendAccountBlocked(target.email, target.first_name || "there", reason || undefined).catch(() => {});
+      deferEmail(() =>
+        sendAccountBlocked(target.email, target.first_name || "there", reason || undefined)
+      );
       await notify(
         id,
         "account_blocked",
@@ -58,7 +60,9 @@ export async function POST(
         { reason }
       );
     } else {
-      sendAccountUnblocked(target.email, target.first_name || "there").catch(() => {});
+      deferEmail(() =>
+        sendAccountUnblocked(target.email, target.first_name || "there")
+      );
       await notify(
         id,
         "account_unblocked",

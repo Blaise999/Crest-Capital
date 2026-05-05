@@ -157,7 +157,7 @@ function MiniCard({ tier }: { tier: CardTier }) {
               light ? "text-white" : "text-ink-700"
             )}
           >
-            N-BANK
+            CREST CAPITAL
           </span>
         </div>
         <Infinit className={cx("h-4 w-4", light ? "text-white/70" : "text-ink-400")} />

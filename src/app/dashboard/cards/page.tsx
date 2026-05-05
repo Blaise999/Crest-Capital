@@ -16,7 +16,7 @@ export default async function CardsPage() {
     .eq("id", u.id)
     .single();
 
-  const holder = `${user?.first_name || "Crest Capital"} ${user?.last_name || "Customer"}`.toUpperCase();
+  const holder = `${user?.first_name || "Account"} ${user?.last_name || "Holder"}`.toUpperCase();
   const last4 = user?.card_last4 || "4417";
 
   return (
@@ -32,7 +32,7 @@ export default async function CardsPage() {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <span className="h-5 w-5 rounded-md bg-brand-500" />
-              <span className="text-[11px] font-bold tracking-[0.2em] uppercase">N-BANK</span>
+              <span className="text-[11px] font-bold tracking-[0.2em] uppercase">CREST CAPITAL</span>
             </div>
             <Infinit className="h-5 w-5 text-white/70" />
           </div>

@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ok, fail, handleError } from "@/lib/http";
 import { generateIban } from "@/lib/utils";
-import { sendOnboardingApproved, sendOnboardingRejected } from "@/lib/email";
+import { sendOnboardingApproved, sendOnboardingRejected, deferEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 
 type NotifyKind = Parameters<typeof notify>[1];
@@ -112,18 +112,10 @@ export async function POST(
         target_id: id,
       });
 
-      sendOnboardingApproved(
-        user.email,
-        user.first_name || "there",
-        iban
-      ).catch(() => {});
-
-      await notify(
-        id,
-        "application_approved" as NotifyKind,
-        "Your account is open",
-        `Welcome to Crest Capital. Your German IBAN has been issued: ${iban}.`,
-        { iban }
+      // Email goes out — but intentionally NO bell notification on account
+      // opening. The welcome belongs in the inbox, not in the activity feed.
+      deferEmail(() =>
+        sendOnboardingApproved(user.email, user.first_name || "there", iban)
       );
 
       return ok({ status: "APPROVED", iban });
@@ -147,11 +139,9 @@ export async function POST(
       notes: reason,
     });
 
-    sendOnboardingRejected(
-      user.email,
-      user.first_name || "there",
-      reason || undefined
-    ).catch(() => {});
+    deferEmail(() =>
+      sendOnboardingRejected(user.email, user.first_name || "there", reason || undefined)
+    );
 
     await notify(
       id,

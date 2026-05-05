@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ok, fail, handleError } from "@/lib/http";
 import { notify } from "@/lib/notify";
 import { fmtMoney } from "@/lib/utils";
+import { sendTransactionPosted, deferEmail } from "@/lib/email";
 
 const CATEGORIES = [
   "Transfer","Income","Bills","Dining","Groceries","Transport","Shopping",
@@ -103,6 +104,24 @@ export async function POST(
       `${body?.merchant || body?.counterparty_name || "Transaction"}${body?.description ? " · " + body.description : ""}`,
       { transaction_id: txn.id }
     );
+
+    // Email the user about the new transaction. Non-blocking via after().
+    if (user.email) {
+      deferEmail(() =>
+        sendTransactionPosted(user.email, {
+          firstName: user.first_name || "there",
+          direction,
+          amount,
+          currency: "EUR",
+          amountFmt: fmtMoney(amount),
+          counterparty: body?.merchant || body?.counterparty_name || undefined,
+          category,
+          accountType: account_type,
+          description: body?.description || undefined,
+          reference: body?.reference || undefined,
+        })
+      );
+    }
 
     return ok({ transaction: txn });
   } catch (e) {

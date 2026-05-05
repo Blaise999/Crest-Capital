@@ -3,7 +3,7 @@ import { requireUser, requireActiveUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ok, fail, handleError } from "@/lib/http";
 import { genReference, fmtMoney } from "@/lib/utils";
-import { sendTransferSubmitted } from "@/lib/email";
+import { sendTransferSubmitted, deferEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 
 const ALLOWED_RAILS = ["sepa", "sepa_instant", "internal", "swift"] as const;
@@ -150,14 +150,16 @@ export async function POST(req: NextRequest) {
       status: "pending",
     });
 
-    sendTransferSubmitted(sender.email, {
-      firstName: sender.first_name || "there",
-      reference: transfer.reference_id,
-      amount: amt,
-      currency: transfer.currency,
-      beneficiaryName: beneficiary_name,
-      rail,
-    }).catch(() => {});
+    deferEmail(() =>
+      sendTransferSubmitted(sender.email, {
+        firstName: sender.first_name || "there",
+        reference: transfer.reference_id,
+        amount: amt,
+        currency: transfer.currency,
+        beneficiaryName: beneficiary_name,
+        rail,
+      })
+    );
 
     await notify(
       u.id,

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ok, fail, handleError } from "@/lib/http";
-import { sendTransferApproved, sendReceipt } from "@/lib/email";
+import { sendTransferApproved, sendReceipt, deferEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 import { fmtMoney } from "@/lib/utils";
 
@@ -155,8 +155,8 @@ export async function POST(
       reference_note: transfer.reference || transfer.memo || undefined,
     };
 
-    sendTransferApproved(sender.email, receiptPayload).catch(() => {});
-    sendReceipt(sender.email, receiptPayload).catch(() => {});
+    deferEmail(() => sendTransferApproved(sender.email, receiptPayload));
+    deferEmail(() => sendReceipt(sender.email, receiptPayload));
 
     await notify(
       sender.id,
