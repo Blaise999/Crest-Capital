@@ -6,6 +6,7 @@ import { CheckCircle2, Clock, Mail, ShieldAlert } from "lucide-react";
 import LogoutButton from "@/components/auth/LogoutButton";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function PendingReviewPage() {
   const u = await getCurrentUser();
@@ -13,11 +14,24 @@ export default async function PendingReviewPage() {
   if (u.role === "admin") redirect("/admin");
 
   const sb = supabaseAdmin();
-  const { data } = await sb
-    .from("users")
-    .select("first_name, onboarding_status, rejection_reason, created_at")
-    .eq("id", u.id)
-    .single();
+  let data:
+    | {
+        first_name?: string | null;
+        onboarding_status?: string | null;
+        rejection_reason?: string | null;
+        created_at?: string | null;
+      }
+    | null = null;
+  try {
+    const res = await sb
+      .from("users")
+      .select("first_name, onboarding_status, rejection_reason, created_at")
+      .eq("id", u.id)
+      .single();
+    data = res.data || null;
+  } catch {
+    data = null;
+  }
 
   if (data?.onboarding_status === "APPROVED") redirect("/dashboard");
 

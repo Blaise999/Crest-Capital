@@ -18,14 +18,18 @@ export default function ForgotResetPage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    const e = sessionStorage.getItem("crst_reset_email");
-    const c = sessionStorage.getItem("crst_reset_code");
-    if (!e || !c) {
+    try {
+      const e = sessionStorage.getItem("crst_reset_email");
+      const c = sessionStorage.getItem("crst_reset_code");
+      if (!e || !c) {
+        router.replace("/forgot-password");
+        return;
+      }
+      setEmail(e);
+      setCode(c);
+    } catch {
       router.replace("/forgot-password");
-      return;
     }
-    setEmail(e);
-    setCode(c);
   }, [router]);
 
   async function submit(e: React.FormEvent) {
@@ -40,15 +44,38 @@ export default function ForgotResetPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, code, password }),
+        credentials: "same-origin",
       });
-      const d = await r.json();
+
+      const raw = await r.text();
+      let d: any = {};
+      try {
+        d = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error("Unexpected server response. Please try again.");
+      }
+
       if (!r.ok || !d.ok) throw new Error(d.error || "Reset failed");
-      sessionStorage.removeItem("crst_reset_email");
-      sessionStorage.removeItem("crst_reset_code");
+
+      try {
+        sessionStorage.removeItem("crst_reset_email");
+        sessionStorage.removeItem("crst_reset_code");
+      } catch {
+        /* ignore */
+      }
+
       setDone(true);
-      setTimeout(() => router.push("/login"), 1600);
+      // Hard navigation for the same reason as login/verify — guarantees the
+      // login page sees a clean session state.
+      setTimeout(() => {
+        if (typeof window !== "undefined") {
+          window.location.assign("/login");
+        } else {
+          router.push("/login");
+        }
+      }, 1600);
     } catch (e: any) {
-      setErr(e.message);
+      setErr(e?.message || "Reset failed");
     } finally {
       setLoading(false);
     }

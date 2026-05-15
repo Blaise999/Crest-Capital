@@ -22,14 +22,29 @@ export default function AdminLoginPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "same-origin",
       });
-      const d = await r.json();
+
+      const raw = await r.text();
+      let d: any = {};
+      try {
+        d = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error("Unexpected server response. Please try again.");
+      }
+
       if (!r.ok || !d.ok) throw new Error(d.error || "Login failed");
+
+      // Hard navigation — see /login/verify for the full explanation. The
+      // admin-login API just Set-Cookie'd; router.push + refresh can race
+      // the cookie commit and trigger the white-screen error.
+      if (typeof window !== "undefined") {
+        window.location.assign("/admin");
+        return;
+      }
       router.push("/admin");
-      router.refresh();
     } catch (e: any) {
-      setErr(e.message);
-    } finally {
+      setErr(e?.message || "Login failed");
       setLoading(false);
     }
   }

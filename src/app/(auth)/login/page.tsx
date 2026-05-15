@@ -24,15 +24,34 @@ export default function LoginPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "same-origin",
       });
-      const d = await r.json();
+
+      const raw = await r.text();
+      let d: any = {};
+      try {
+        d = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error("Unexpected server response. Please try again.");
+      }
+
       if (!r.ok || !d.ok) throw new Error(d.error || "Login failed");
-      // Store email in sessionStorage so /login/verify can use it
-      sessionStorage.setItem("crst_login_email", email);
-      if (d.emailMasked) sessionStorage.setItem("crst_login_email_masked", d.emailMasked);
+
+      // Store email in sessionStorage so /login/verify can use it.
+      // Wrap in try/catch — private-mode WebViews on some mobile browsers
+      // throw on any storage access.
+      try {
+        sessionStorage.setItem("crst_login_email", email);
+        if (d.emailMasked) {
+          sessionStorage.setItem("crst_login_email_masked", d.emailMasked);
+        }
+      } catch {
+        /* fall back — /login/verify will redirect us back here if it can't
+           read the email, which is the correct behavior. */
+      }
       router.push("/login/verify");
     } catch (e: any) {
-      setErr(e.message);
+      setErr(e?.message || "Login failed");
     } finally {
       setLoading(false);
     }

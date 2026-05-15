@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, XCircle, Printer, Loader2 } from "lucide-react";
-import { fmtMoney, fmtDate, maskIban, cx } from "@/lib/utils";
+import { fmtMoney, fmtDate, cx } from "@/lib/utils";
 
 export default function ReceiptPage({ params }: { params: Promise<{ ref: string }> }) {
   const { ref } = use(params);
@@ -11,9 +11,10 @@ export default function ReceiptPage({ params }: { params: Promise<{ ref: string 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/transfers/${ref}`)
+    fetch(`/api/transfers/${ref}`, { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((d) => setT(d.transfer || null))
+      .then((d) => setT(d?.transfer || null))
+      .catch(() => setT(null))
       .finally(() => setLoading(false));
   }, [ref]);
 
@@ -46,13 +47,19 @@ export default function ReceiptPage({ params }: { params: Promise<{ ref: string 
   };
   const s = statusMap[status] || statusMap.completed;
 
+  function safePrint() {
+    if (typeof window !== "undefined" && typeof window.print === "function") {
+      window.print();
+    }
+  }
+
   return (
     <div className="pt-4 sm:pt-6 max-w-2xl mx-auto pb-12 print:pt-0">
       <div className="flex items-center justify-between print:hidden">
         <Link href="/dashboard/transactions" className="inline-flex items-center gap-1.5 text-[13px] text-ink-500 hover:text-ink-900">
           <ArrowLeft className="h-4 w-4" /> All transactions
         </Link>
-        <button onClick={() => window.print()} className="btn btn-ghost h-9 px-3">
+        <button onClick={safePrint} className="btn btn-ghost h-9 px-3" type="button">
           <Printer className="h-4 w-4" /> Print
         </button>
       </div>
@@ -67,7 +74,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ ref: string 
             <h1 className="mt-3 text-[28px] font-bold tracking-tight text-ink-900">
               Payment receipt
             </h1>
-            <div className="text-[13px] text-ink-500 mt-0.5">Reference {t.reference_id}</div>
+            <div className="text-[13px] text-ink-500 mt-0.5">Reference {t.reference_id || "—"}</div>
           </div>
           <span className={cx("inline-flex items-center gap-1.5 rounded-full text-[11px] font-bold uppercase tracking-wide px-3 py-1.5", s.bg, s.fg)}>
             <s.Icon className="h-3.5 w-3.5" />
@@ -79,11 +86,11 @@ export default function ReceiptPage({ params }: { params: Promise<{ ref: string 
         <div className="mt-8 pb-6 border-b border-ink-100">
           <div className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-ink-500">Amount</div>
           <div className="mt-1 text-[44px] sm:text-[52px] font-bold text-ink-900 tracking-tight tabular-nums leading-none">
-            {fmtMoney(Number(t.amount), t.currency)}
+            {fmtMoney(Number(t.amount) || 0, t.currency || "EUR")}
           </div>
-          {t.fee > 0 && (
+          {Number(t.fee) > 0 && (
             <div className="mt-1 text-[12.5px] text-ink-500">
-              + fee {fmtMoney(Number(t.fee), t.currency)}
+              + fee {fmtMoney(Number(t.fee), t.currency || "EUR")}
             </div>
           )}
         </div>
@@ -97,7 +104,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ ref: string 
           </div>
           <div>
             <div className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-2">To</div>
-            <Row k="Name" v={t.beneficiary_name} />
+            <Row k="Name" v={t.beneficiary_name || "—"} />
             {t.beneficiary_iban && <Row k="IBAN" v={t.beneficiary_iban} />}
             {t.beneficiary_bic && <Row k="BIC / SWIFT" v={t.beneficiary_bic} />}
             {t.beneficiary_country && <Row k="Country" v={t.beneficiary_country} />}
@@ -108,7 +115,7 @@ export default function ReceiptPage({ params }: { params: Promise<{ ref: string 
         <div className="mt-6 pt-6 border-t border-ink-100 grid sm:grid-cols-2 gap-6">
           <div>
             <div className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-ink-500 mb-2">Dates</div>
-            <Row k="Submitted" v={fmtDate(t.created_at)} />
+            {t.created_at && <Row k="Submitted" v={fmtDate(t.created_at)} />}
             {t.completed_at && <Row k="Completed" v={fmtDate(t.completed_at)} />}
             {t.reviewed_at && !t.completed_at && <Row k="Reviewed" v={fmtDate(t.reviewed_at)} />}
           </div>
@@ -139,13 +146,18 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-function accountLabel(a: string) {
+function accountLabel(a: string | null | undefined) {
   return a === "savings" ? "Savings" : "Checking";
 }
-function railLabel(r: string) {
+
+// Null-safe — original threw `r.toUpperCase()` on null.
+function railLabel(r: string | null | undefined) {
+  if (!r) return "Transfer";
   if (r === "sepa_instant") return "SEPA Instant";
   if (r === "sepa") return "SEPA Transfer";
   if (r === "internal") return "Internal Transfer";
   if (r === "swift") return "International (SWIFT)";
-  return r.toUpperCase();
+  if (r === "topup") return "Top-up";
+  if (r === "fee") return "Fee";
+  return String(r).toUpperCase();
 }

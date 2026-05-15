@@ -6,6 +6,12 @@ import { DashSidebar } from "@/components/dashboard/DashSidebar";
 import { DashTopbar } from "@/components/dashboard/DashTopbar";
 import { FlaggedBanner } from "@/components/dashboard/FlaggedBanner";
 
+// The dashboard is always per-user and reads the session cookie. Without
+// this hint Next will sometimes try to pre-render or cache aggressively
+// and the cookies() call ends up out of sync with the actual request.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function DashboardLayout({
   children,
 }: {
@@ -16,14 +22,32 @@ export default async function DashboardLayout({
   if (user.role === "admin") redirect("/admin");
 
   const sb = supabaseAdmin();
-  const { data } = await sb
-    .from("users")
-    .select("first_name, blocked, blocked_reason, blocked_at, onboarding_status")
-    .eq("id", user.id)
-    .single();
+  // Tolerate a failed extra query — the layout used to assume `data` was
+  // always populated; if Supabase is briefly unreachable the layout would
+  // throw and you'd see the "Application error" screen.
+  let extra: {
+    first_name?: string | null;
+    blocked?: boolean | null;
+    blocked_reason?: string | null;
+    blocked_at?: string | null;
+    onboarding_status?: string | null;
+  } | null = null;
+
+  try {
+    const { data } = await sb
+      .from("users")
+      .select("first_name, blocked, blocked_reason, blocked_at, onboarding_status")
+      .eq("id", user.id)
+      .single();
+    extra = data || null;
+  } catch {
+    extra = null;
+  }
 
   // Pending / rejected onboarding still gates here (they haven't been approved).
-  if (data?.onboarding_status !== "APPROVED") {
+  // If we couldn't read onboarding_status at all, fall through to the
+  // dashboard rather than dumping the user in a redirect loop.
+  if (extra && extra.onboarding_status && extra.onboarding_status !== "APPROVED") {
     redirect("/pending-review");
   }
 
@@ -36,8 +60,8 @@ export default async function DashboardLayout({
         <DashTopbar user={user} />
         {user.blocked && (
           <FlaggedBanner
-            reason={data?.blocked_reason}
-            blockedAt={data?.blocked_at}
+            reason={extra?.blocked_reason || null}
+            blockedAt={extra?.blocked_at || null}
           />
         )}
         <main className="px-5 sm:px-8 pb-16 pt-4">{children}</main>

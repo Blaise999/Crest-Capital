@@ -15,8 +15,6 @@ import {
   TrendingDown,
   Sparkles,
   Clock,
-  CheckCircle2,
-  XCircle,
   PiggyBank,
 } from "lucide-react";
 import { fmtMoney, fmtRelativeDate, maskIban, cx } from "@/lib/utils";
@@ -55,10 +53,24 @@ type Transfer = {
   beneficiary_name: string;
   amount: number | string;
   currency: string;
-  rail: string;
+  rail: string | null;
   status: string;
   created_at: string;
 };
+
+// Safe number coercion: never propagate NaN into rendered text.
+function num(v: unknown): number {
+  const n = typeof v === "string" ? Number(v) : (v as number);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Defensive timestamp parser. Returns NaN for nullish/invalid dates so
+// downstream comparisons evaluate to false instead of throwing.
+function ts(v: unknown): number {
+  if (!v) return NaN;
+  const t = new Date(v as any).getTime();
+  return Number.isFinite(t) ? t : NaN;
+}
 
 export default function DashboardOverview() {
   const [me, setMe] = useState<User | null>(null);
@@ -67,18 +79,37 @@ export default function DashboardOverview() {
   const [account, setAccount] = useState<"checking" | "savings">("checking");
   const [hideBalance, setHideBalance] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
+    setLoadErr(null);
     try {
       const [a, b, c] = await Promise.all([
-        fetch("/api/auth/me").then((r) => r.json()),
-        fetch("/api/transactions?sinceDays=60").then((r) => r.json()),
-        fetch("/api/transfers").then((r) => r.json()),
+        fetch("/api/auth/me", { credentials: "same-origin" })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false })),
+        fetch("/api/transactions?sinceDays=60", { credentials: "same-origin" })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false })),
+        fetch("/api/transfers", { credentials: "same-origin" })
+          .then((r) => r.json())
+          .catch(() => ({ ok: false })),
       ]);
-      if (a.ok) setMe(a.user);
-      if (b.ok) setTxns(b.transactions);
-      if (c.ok) setTransfers(c.transfers);
+      if (a?.ok && a.user) setMe(a.user);
+      if (b?.ok && Array.isArray(b.transactions)) setTxns(b.transactions);
+      if (c?.ok && Array.isArray(c.transfers)) setTransfers(c.transfers);
+
+      // If the /me call failed outright, surface it so the page isn't blank.
+      if (!a?.ok) {
+        setLoadErr(
+          "We couldn't load your account details. Please refresh the page."
+        );
+      }
+    } catch (e: any) {
+      // Final safety net — should never get here, but better than throwing
+      // into the dashboard's error boundary.
+      setLoadErr(e?.message || "Failed to load your dashboard");
     } finally {
       setLoading(false);
     }
@@ -90,47 +121,62 @@ export default function DashboardOverview() {
 
   // Derived KPIs for the selected account
   const accountTxns = useMemo(
-    () => txns.filter((t) => t.account_type === account),
+    () => (txns || []).filter((t) => t && t.account_type === account),
     [txns, account]
   );
 
   const last30 = useMemo(() => {
     const cutoff = Date.now() - 30 * 86400000;
-    return accountTxns.filter((t) => new Date(t.created_at).getTime() >= cutoff);
+    return accountTxns.filter((t) => {
+      const t0 = ts(t.created_at);
+      return Number.isFinite(t0) && t0 >= cutoff;
+    });
   }, [accountTxns]);
 
   const spent30 = last30
     .filter((t) => t.direction === "debit")
-    .reduce((s, t) => s + Number(t.amount), 0);
+    .reduce((s, t) => s + num(t.amount), 0);
   const recv30 = last30
     .filter((t) => t.direction === "credit")
-    .reduce((s, t) => s + Number(t.amount), 0);
+    .reduce((s, t) => s + num(t.amount), 0);
 
   // vs the previous 30 days
   const prev30 = useMemo(() => {
     const cutoff = Date.now() - 60 * 86400000;
     const cutoff2 = Date.now() - 30 * 86400000;
-    return accountTxns.filter(
-      (t) =>
-        new Date(t.created_at).getTime() >= cutoff &&
-        new Date(t.created_at).getTime() < cutoff2
-    );
+    return accountTxns.filter((t) => {
+      const t0 = ts(t.created_at);
+      return Number.isFinite(t0) && t0 >= cutoff && t0 < cutoff2;
+    });
   }, [accountTxns]);
-  const spentPrev = prev30.filter((t) => t.direction === "debit").reduce((s, t) => s + Number(t.amount), 0);
+  const spentPrev = prev30
+    .filter((t) => t.direction === "debit")
+    .reduce((s, t) => s + num(t.amount), 0);
   const delta = spentPrev > 0 ? ((spent30 - spentPrev) / spentPrev) * 100 : 0;
 
-  const currentBalance = account === "checking"
-    ? Number(me?.balance_checking || 0)
-    : Number(me?.balance_savings || 0);
-  const otherBalance = account === "checking"
-    ? Number(me?.balance_savings || 0)
-    : Number(me?.balance_checking || 0);
+  const currentBalance =
+    account === "checking"
+      ? num(me?.balance_checking)
+      : num(me?.balance_savings);
+  const otherBalance =
+    account === "checking"
+      ? num(me?.balance_savings)
+      : num(me?.balance_checking);
 
   const recentTxns = accountTxns.slice(0, 8);
-  const pendingTransfers = transfers.filter((t) => t.status === "pending_admin").slice(0, 4);
+  const pendingTransfers = (transfers || [])
+    .filter((t) => t && t.status === "pending_admin")
+    .slice(0, 4);
 
   return (
     <div className="pt-4 sm:pt-6 pb-8 space-y-4 sm:space-y-6">
+      {/* Inline error banner so a failed fetch doesn't black out the page */}
+      {loadErr && (
+        <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 text-[13.5px] p-3">
+          {loadErr}
+        </div>
+      )}
+
       {/* Greeting + switcher */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -138,7 +184,7 @@ export default function DashboardOverview() {
             Hi, {me?.first_name || "there"}
           </h1>
           <p className="text-[12.5px] sm:text-[13.5px] text-ink-500 mt-0.5">
-            Here's what's happening with your money.
+            Here&apos;s what&apos;s happening with your money.
           </p>
         </div>
         <AccountSwitcher value={account} onChange={setAccount} />
@@ -288,7 +334,7 @@ export default function DashboardOverview() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[13.5px] font-semibold text-ink-900 truncate">
-                    {t.beneficiary_name}
+                    {t.beneficiary_name || "—"}
                   </div>
                   <div className="text-[11.5px] text-ink-400">
                     {t.reference_id} · {railLabel(t.rail)}
@@ -296,7 +342,7 @@ export default function DashboardOverview() {
                 </div>
                 <div className="text-right">
                   <div className="text-[14px] font-bold text-ink-900 tabular-nums">
-                    {fmtMoney(Number(t.amount), t.currency)}
+                    {fmtMoney(num(t.amount), t.currency || "EUR")}
                   </div>
                   <div className="text-[10.5px] text-amber-700 font-semibold uppercase tracking-wide">
                     Pending
@@ -339,7 +385,7 @@ export default function DashboardOverview() {
                     {t.counterparty_name || t.merchant || "Transaction"}
                   </div>
                   <div className="text-[11.5px] text-ink-400 truncate">
-                    {fmtRelativeDate(t.created_at)} · {t.category || "—"}
+                    {t.created_at ? fmtRelativeDate(t.created_at) : "—"} · {t.category || "—"}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -350,7 +396,7 @@ export default function DashboardOverview() {
                     )}
                   >
                     {t.direction === "credit" ? "+ " : "− "}
-                    {fmtMoney(Number(t.amount), t.currency)}
+                    {fmtMoney(num(t.amount), t.currency || "EUR")}
                   </div>
                 </div>
               </li>
@@ -398,10 +444,16 @@ function ActionTile({ Icon, label, href }: { Icon: any; label: string; href: str
   );
 }
 
-function railLabel(r: string) {
+// Null-safe rail label — see receipt page and transactions page for the
+// same defensive pattern. The original `r.toUpperCase()` blew up the entire
+// dashboard whenever a pending transfer happened to have a null/empty rail.
+function railLabel(r: string | null | undefined) {
+  if (!r) return "Transfer";
   if (r === "sepa_instant") return "SEPA Instant";
   if (r === "sepa") return "SEPA Transfer";
   if (r === "internal") return "Internal Transfer";
   if (r === "swift") return "International (SWIFT)";
-  return r.toUpperCase();
+  if (r === "topup") return "Top-up";
+  if (r === "fee") return "Fee";
+  return String(r).toUpperCase();
 }

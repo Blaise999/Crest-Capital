@@ -17,14 +17,21 @@ export default function LoginVerifyPage() {
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    const e = sessionStorage.getItem("crst_login_email");
-    const m = sessionStorage.getItem("crst_login_email_masked");
-    if (!e) {
+    // sessionStorage may be unavailable in private-mode WebViews on some
+    // mobile browsers — guard it so we don't crash the verify page itself.
+    try {
+      const e = sessionStorage.getItem("crst_login_email");
+      const m = sessionStorage.getItem("crst_login_email_masked");
+      if (!e) {
+        router.replace("/login");
+        return;
+      }
+      setEmail(e);
+      if (m) setMasked(m);
+    } catch {
       router.replace("/login");
       return;
     }
-    setEmail(e);
-    if (m) setMasked(m);
     inputs.current[0]?.focus();
   }, [router]);
 
@@ -64,29 +71,72 @@ export default function LoginVerifyPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, code: c }),
+        // Important: include credentials so the Set-Cookie from the response
+        // is honored and attached to subsequent requests in the same origin.
+        credentials: "same-origin",
       });
-      const d = await r.json();
-      if (!r.ok || !d.ok) throw new Error(d.error || "Invalid code");
-      sessionStorage.removeItem("crst_login_email");
-      sessionStorage.removeItem("crst_login_email_masked");
-      router.push(d.redirect || "/dashboard");
-      router.refresh();
+
+      // Read body as text first so a non-JSON 500 doesn't itself throw.
+      const raw = await r.text();
+      let d: any = {};
+      try {
+        d = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error("Unexpected server response. Please try again.");
+      }
+
+      if (!r.ok || !d.ok) {
+        throw new Error(d.error || "Invalid code");
+      }
+
+      try {
+        sessionStorage.removeItem("crst_login_email");
+        sessionStorage.removeItem("crst_login_email_masked");
+      } catch {
+        /* ignore */
+      }
+
+      const target = d.redirect || "/dashboard";
+
+      // CRITICAL FIX:
+      // Previously this used `router.push(target); router.refresh();`. In
+      // Next 14 App Router, that pair starts a *soft* RSC navigation
+      // immediately after the response — which can race the browser
+      // committing the Set-Cookie header from the same response. When the
+      // race is lost (slow networks, certain regions, strict cookie
+      // policies), the server-rendered dashboard layout sees no session,
+      // calls redirect("/login") mid-navigation, and the unhandled
+      // NEXT_REDIRECT surfaces in the browser as
+      // "Application error: a client-side exception has occurred".
+      //
+      // A hard navigation (`window.location.assign`) makes the browser
+      // issue a brand-new top-level request *after* the cookie is in the
+      // jar, eliminating the race entirely.
+      if (typeof window !== "undefined") {
+        window.location.assign(target);
+      } else {
+        // SSR safety — should never run for this code path.
+        router.replace(target);
+      }
     } catch (e: any) {
-      setErr(e.message);
+      setErr(e?.message || "Something went wrong");
       setCode(Array(6).fill(""));
       inputs.current[0]?.focus();
-    } finally {
       setLoading(false);
     }
   }
 
   async function resend() {
     setErr(null);
-    await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email, password: "__resend__" }),
-    }).catch(() => {});
+    try {
+      await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: "__resend__" }),
+      });
+    } catch {
+      /* ignore — UX is "we tried" */
+    }
   }
 
   return (
@@ -140,7 +190,7 @@ export default function LoginVerifyPage() {
           )}
 
           <div className="mt-5 flex items-center justify-between text-[13px]">
-            <button onClick={resend} className="text-brand-600 font-semibold hover:underline">
+            <button onClick={resend} className="text-brand-600 font-semibold hover:underline" type="button">
               Resend code
             </button>
             {loading && (
@@ -151,7 +201,7 @@ export default function LoginVerifyPage() {
           </div>
 
           <div className="mt-8 rounded-xl bg-ink-50 border border-ink-100 p-3 text-[12px] text-ink-500">
-            Didn't get a code? <span className="font-mono text-ink-900">Try Again</span>.
+            Didn&apos;t get a code? <span className="font-mono text-ink-900">Try Again</span>.
             Check spam folder
           </div>
         </div>

@@ -121,13 +121,31 @@ export default function SignupPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(form),
+        credentials: "same-origin",
       });
-      const d = await r.json();
+
+      const raw = await r.text();
+      let d: any = {};
+      try {
+        d = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error("Unexpected server response. Please try again.");
+      }
+
       if (!r.ok || !d.ok) throw new Error(d.error || "Sign-up failed");
+
+      // Hard navigation: the signup API just Set-Cookie'd the session
+      // and /pending-review is a server-rendered page that reads cookies.
+      // router.push runs a soft RSC request that can race the cookie commit
+      // on slow networks → server sees no session → redirect("/login") →
+      // mid-navigation NEXT_REDIRECT → "Application error" white screen.
+      if (typeof window !== "undefined") {
+        window.location.assign("/pending-review");
+        return;
+      }
       router.push("/pending-review");
     } catch (e: any) {
-      setErr(e.message);
-    } finally {
+      setErr(e?.message || "Sign-up failed");
       setLoading(false);
     }
   }

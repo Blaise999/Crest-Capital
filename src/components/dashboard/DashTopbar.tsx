@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, Send, LogOut, Menu } from "lucide-react";
 import { useState } from "react";
-import type { SessionUser } from "@/lib/auth";
+import type { SessionUser } from "@/lib/auth-types";
 import { cx, hashStr } from "@/lib/utils";
 import { NotificationsBell } from "./NotificationsBell";
 
@@ -16,6 +16,7 @@ function initials(u: SessionUser) {
 
 function hue(id: string) {
   // Deterministic hue so the avatar color is stable per user
+  if (!id) return 210;
   return hashStr(id) % 360;
 }
 
@@ -24,9 +25,13 @@ export function DashTopbar({ user }: { user: SessionUser }) {
   const router = useRouter();
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
-    router.refresh();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* ignore — we redirect either way */
+    }
+    // Hard navigation so the cleared cookie is honored on the next request.
+    window.location.assign("/");
   }
 
   return (

@@ -20,8 +20,12 @@ export default function ForgotPasswordPage() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email }),
-      });
-      sessionStorage.setItem("crst_reset_email", email);
+      }).catch(() => {});
+      try {
+        sessionStorage.setItem("crst_reset_email", email);
+      } catch {
+        /* private-mode WebViews throw on storage access */
+      }
       router.push("/forgot-password/verify");
     } finally {
       setLoading(false);

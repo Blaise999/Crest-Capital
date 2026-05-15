@@ -16,12 +16,17 @@ export default function ForgotVerifyPage() {
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    const e = sessionStorage.getItem("crst_reset_email");
-    if (!e) {
+    try {
+      const e = sessionStorage.getItem("crst_reset_email");
+      if (!e) {
+        router.replace("/forgot-password");
+        return;
+      }
+      setEmail(e);
+    } catch {
       router.replace("/forgot-password");
       return;
     }
-    setEmail(e);
     inputs.current[0]?.focus();
   }, [router]);
 
@@ -32,7 +37,11 @@ export default function ForgotVerifyPage() {
     setCode(next);
     if (v && i < 5) inputs.current[i + 1]?.focus();
     if (next.every((d) => d)) {
-      sessionStorage.setItem("crst_reset_code", next.join(""));
+      try {
+        sessionStorage.setItem("crst_reset_code", next.join(""));
+      } catch {
+        /* ignore */
+      }
       router.push("/forgot-password/reset");
     }
   }
@@ -49,7 +58,11 @@ export default function ForgotVerifyPage() {
     for (let i = 0; i < text.length; i++) next[i] = text[i];
     setCode(next);
     if (text.length === 6) {
-      sessionStorage.setItem("crst_reset_code", text);
+      try {
+        sessionStorage.setItem("crst_reset_code", text);
+      } catch {
+        /* ignore */
+      }
       router.push("/forgot-password/reset");
     } else {
       inputs.current[text.length]?.focus();

@@ -2,19 +2,13 @@ import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { supabaseAdmin } from "./supabase/admin";
+import type { SessionUser } from "./auth-types";
+
+// Re-export so existing server-side imports `from "@/lib/auth"` keep working.
+export type { SessionUser };
 
 const COOKIE_NAME = "crst_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
-
-export type SessionUser = {
-  id: string;
-  email: string;
-  role: "user" | "admin";
-  first_name: string | null;
-  last_name: string | null;
-  avatar_url: string | null;
-  blocked: boolean;
-};
 
 function jwtSecret() {
   const s = process.env.JWT_SECRET;
