@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Mail, Phone, X } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
 
 export function FlaggedBanner({
@@ -50,23 +50,16 @@ export function FlaggedBanner({
                 <div className="mt-1 text-red-800">{reason}</div>
               </div>
             )}
-            <div className="grid sm:grid-cols-3 gap-2 text-[12.5px]">
-              <a
-                href="mailto:support@crestcapital.com?subject=Account%20review%20assistance"
-                className="inline-flex items-center gap-2 rounded-xl bg-white/70 hover:bg-white border border-red-200 px-3 py-2 text-red-900 font-semibold"
-              >
-                <Mail className="h-4 w-4" /> support@crestcapital.com
-              </a>
-              <a
-                href="tel:+493055582828"
-                className="inline-flex items-center gap-2 rounded-xl bg-white/70 hover:bg-white border border-red-200 px-3 py-2 text-red-900 font-semibold"
-              >
-                <Phone className="h-4 w-4" /> +49 30 555 82 82
-              </a>
+
+            <div className="text-[12.5px] space-y-2">
               <div className="inline-flex items-center gap-2 rounded-xl bg-white/70 border border-red-200 px-3 py-2 text-red-900 font-semibold tabular-nums">
                 Ref · {ticket}
               </div>
+              <p className="text-red-700/90">
+                For further inquiries, please click on the support widget below.
+              </p>
             </div>
+
             <p className="text-[11.5px] text-red-700/80 leading-relaxed">
               Your funds are safe and protected by the German deposit-guarantee scheme up to 100.000 €. Most reviews complete within 1–2 business days — we'll email you the moment it's done.
             </p>
