@@ -114,7 +114,7 @@ export default function AdminApplicationsPage() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-ink-800 bg-ink-900/60 overflow-hidden">
+      <div className="rounded-2xl border border-ink-800 bg-ink-900/60 overflow-x-auto">
         {loading ? (
           <div className="p-10 text-center text-[13px] text-ink-400">
             <Loader2 className="inline h-4 w-4 animate-spin mr-2" /> Loading applications…

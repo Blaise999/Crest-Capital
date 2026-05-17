@@ -48,7 +48,7 @@ export default function AdminTransactionsPage() {
         </div>
       </div>
 
-      <div className="card p-0 overflow-hidden">
+      <div className="card p-0 overflow-x-auto">
         {rows === null ? (
           <div className="p-10 text-center text-[14px] text-ink-400">
             <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
@@ -57,7 +57,7 @@ export default function AdminTransactionsPage() {
         ) : rows.length === 0 ? (
           <div className="p-10 text-center text-[14px] text-ink-500">No transactions.</div>
         ) : (
-          <table className="w-full text-left">
+          <table className="w-full text-left min-w-[720px]">
             <thead className="bg-ink-50/60 text-[11.5px] font-semibold uppercase tracking-wide text-ink-500">
               <tr>
                 <th className="px-5 py-3"></th>

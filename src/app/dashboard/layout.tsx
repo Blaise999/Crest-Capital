@@ -5,6 +5,7 @@ import { Logo } from "@/components/landing/Logo";
 import { DashSidebar } from "@/components/dashboard/DashSidebar";
 import { DashTopbar } from "@/components/dashboard/DashTopbar";
 import { FlaggedBanner } from "@/components/dashboard/FlaggedBanner";
+import { SupportWidget } from "@/components/support/SupportWidget";
 
 // The dashboard is always per-user and reads the session cookie. Without
 // this hint Next will sometimes try to pre-render or cache aggressively
@@ -71,6 +72,7 @@ export default async function DashboardLayout({
           <span>Need help? support@crestcapital.com</span>
         </footer>
       </div>
+      <SupportWidget />
     </div>
   );
 }

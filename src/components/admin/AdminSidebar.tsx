@@ -10,9 +10,11 @@ import {
   ClipboardList,
   LogOut,
   ShieldCheck,
+  MessageSquare,
 } from "lucide-react";
 import { Logo } from "@/components/landing/Logo";
 import { cx } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 const NAV = [
   { href: "/admin", label: "Overview", Icon: LayoutDashboard, exact: true },
@@ -20,16 +22,42 @@ const NAV = [
   { href: "/admin/users", label: "Users", Icon: Users },
   { href: "/admin/transfers", label: "Transfers", Icon: ArrowLeftRight },
   { href: "/admin/transactions", label: "Transactions", Icon: Receipt },
+  { href: "/admin/support", label: "Support", Icon: MessageSquare },
 ];
 
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [supportUnread, setSupportUnread] = useState(0);
+
+  useEffect(() => {
+    let on = true;
+    async function load() {
+      try {
+        const r = await fetch("/api/admin/support", {
+          credentials: "same-origin",
+        });
+        const d = await r.json().catch(() => null);
+        if (on && d?.ok) setSupportUnread(d.totalUnread || 0);
+      } catch {
+        /* ignore */
+      }
+    }
+    load();
+    const t = setInterval(load, 15000);
+    return () => {
+      on = false;
+      clearInterval(t);
+    };
+  }, [pathname]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
+    if (typeof window !== "undefined") {
+      window.location.assign("/admin-login");
+      return;
+    }
     router.push("/admin-login");
-    router.refresh();
   }
 
   return (
@@ -62,6 +90,11 @@ export function AdminSidebar() {
                 >
                   <it.Icon className="h-4 w-4" />
                   {it.label}
+                  {it.href === "/admin/support" && supportUnread > 0 && (
+                    <span className="ml-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold grid place-items-center">
+                      {supportUnread}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -101,7 +134,12 @@ export function AdminSidebar() {
                 )}
               >
                 <it.Icon className="h-4 w-4" />
-                {it.label}
+                <span className="flex-1">{it.label}</span>
+                {it.href === "/admin/support" && supportUnread > 0 && (
+                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold grid place-items-center">
+                    {supportUnread}
+                  </span>
+                )}
               </Link>
             );
           })}

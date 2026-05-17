@@ -195,7 +195,7 @@ create index if not exists tx_transfer_idx  on public.transactions (transfer_id)
 create table if not exists public.notifications (
   id            uuid primary key default uuid_generate_v4(),
   user_id       uuid not null references public.users(id) on delete cascade,
-  kind          text not null check (kind in ('transfer_submitted','transfer_approved','transfer_rejected','account_blocked','account_unblocked','credit','debit','welcome','security','info','admin_adjustment','application_approved','application_rejected')),
+  kind          text not null check (kind in ('transfer_submitted','transfer_approved','transfer_rejected','account_blocked','account_unblocked','credit','debit','welcome','security','info','admin_adjustment','application_approved','application_rejected','support_reply')),
   title         text not null,
   body          text,
   metadata      jsonb,
@@ -219,6 +219,67 @@ create table if not exists public.otp_codes (
   created_at  timestamptz not null default now()
 );
 create index if not exists otp_email_idx on public.otp_codes (email, purpose, created_at desc);
+
+-- ----------------------------------------------------------------------------
+-- SUPPORT CHAT
+-- One conversation per user. Admin and user exchange messages in real time.
+-- Realtime is delivered via Supabase Realtime (postgres_changes) on the
+-- support_messages table, with a polling fallback in the client.
+-- ----------------------------------------------------------------------------
+create table if not exists public.support_conversations (
+  id              uuid primary key default uuid_generate_v4(),
+  user_id         uuid not null unique references public.users(id) on delete cascade,
+
+  status          text not null default 'open'
+                  check (status in ('open','closed')),
+
+  -- denormalised helpers for the admin inbox list
+  last_message    text,
+  last_message_at timestamptz,
+  last_sender     text check (last_sender in ('user','admin')),
+
+  -- unread counters, per side
+  unread_admin    integer not null default 0,
+  unread_user     integer not null default 0,
+
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+create index if not exists supp_conv_user_idx
+  on public.support_conversations (user_id);
+create index if not exists supp_conv_activity_idx
+  on public.support_conversations (last_message_at desc nulls last);
+create index if not exists supp_conv_unread_idx
+  on public.support_conversations (unread_admin)
+  where unread_admin > 0;
+
+create table if not exists public.support_messages (
+  id              uuid primary key default uuid_generate_v4(),
+  conversation_id uuid not null
+                  references public.support_conversations(id) on delete cascade,
+  user_id         uuid not null references public.users(id) on delete cascade,
+
+  -- who wrote this line
+  sender          text not null check (sender in ('user','admin')),
+  sender_id       uuid references public.users(id),
+  sender_name     text,
+
+  body            text not null check (char_length(body) between 1 and 4000),
+
+  read_by_user    boolean not null default false,
+  read_by_admin   boolean not null default false,
+
+  created_at      timestamptz not null default now()
+);
+create index if not exists supp_msg_conv_idx
+  on public.support_messages (conversation_id, created_at asc);
+create index if not exists supp_msg_user_idx
+  on public.support_messages (user_id, created_at desc);
+
+-- keep support_conversations.updated_at fresh
+drop trigger if exists supp_conv_set_updated on public.support_conversations;
+create trigger supp_conv_set_updated before update on public.support_conversations
+  for each row execute function public.set_updated_at();
 
 -- ----------------------------------------------------------------------------
 -- ADMIN AUDIT
@@ -265,6 +326,29 @@ alter table public.transactions     enable row level security;
 alter table public.notifications    enable row level security;
 alter table public.otp_codes        enable row level security;
 alter table public.admin_actions    enable row level security;
+alter table public.support_conversations enable row level security;
+alter table public.support_messages      enable row level security;
+
+-- ----------------------------------------------------------------------------
+-- REALTIME — broadcast row changes on the support tables so the chat UI
+-- updates instantly. The app authorises every read/write through the
+-- service-role key in API routes; the client only ever subscribes to
+-- changes and then re-fetches through the authorised API, so it is safe
+-- to publish these tables.
+-- ----------------------------------------------------------------------------
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end$$;
+
+alter publication supabase_realtime add table public.support_messages;
+alter publication supabase_realtime add table public.support_conversations;
+
+-- Ensure full row data is delivered on UPDATE/DELETE events
+alter table public.support_messages      replica identity full;
+alter table public.support_conversations replica identity full;
 
 -- ----------------------------------------------------------------------------
 -- SEED — admin Valentine Nonny

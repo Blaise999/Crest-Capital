@@ -10,7 +10,8 @@ type Kind =
   | "debit"
   | "welcome"
   | "security"
-  | "info";
+  | "info"
+  | "support_reply";
 
 /**
  * Insert a notification for a user. Best-effort — failures are logged but never thrown.

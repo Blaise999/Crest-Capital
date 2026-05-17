@@ -34,7 +34,7 @@ export default async function AdminLayout({
           </div>
         </div>
 
-        <main className="px-4 sm:px-5 lg:px-8 pb-16 pt-4">{children}</main>
+        <main className="px-4 sm:px-5 lg:px-8 pb-16 pt-4 overflow-x-auto max-w-full">{children}</main>
       </div>
     </div>
   );

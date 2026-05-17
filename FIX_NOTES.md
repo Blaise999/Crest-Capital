@@ -159,3 +159,114 @@ No schema changes, no env var additions, no package changes.
 4. If anything still breaks, the new error boundary will display the
    real digest. Search the Vercel function logs for that digest to
    get the actual stack trace.
+
+---
+
+# Support chat (real-time admin ⇄ user messaging)
+
+A floating support widget for customers plus an admin inbox where
+admins read and reply in real time.
+
+## Run the database migration
+
+In the Supabase SQL editor, run **one** of:
+
+- `supabase/schema.sql` — full schema (now includes the chat tables),
+  safe to re-run, or
+- `supabase/migrations/0001_support_chat.sql` — adds ONLY the chat
+  objects to an existing database. Nothing is dropped.
+
+The migration creates `support_conversations` and `support_messages`,
+adds the `support_reply` notification kind, enables RLS, and adds the
+two tables to the `supabase_realtime` publication.
+
+## Add the anon key (optional but recommended)
+
+For instant delivery, set the public anon key so the browser can
+subscribe to Supabase Realtime:
+
+```
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
+```
+
+Find it in Supabase → Project Settings → API → "anon public".
+
+**If you skip this**, the chat still works — it automatically falls
+back to polling every ~4 seconds. No code change needed either way.
+
+## How it works
+
+- **Customer side:** a floating button on every `/dashboard/*` page
+  opens a chat panel (`src/components/support/SupportWidget.tsx`).
+- **Admin side:** a new "Support" item in the admin sidebar with a live
+  unread badge → `/admin/support` (inbox) → `/admin/support/[userId]`
+  (thread). Admin replies are delivered instantly and also create an
+  in-app notification (`support_reply`) for the customer.
+- **Security:** the browser never writes to the DB directly. Every
+  read/write goes through authorised server API routes using the
+  service-role key (`requireUser` / `requireAdmin`). The anon key is
+  used *only* to subscribe to row-change events; the payload is then
+  re-fetched through the authorised API. De-duping by message id means
+  realtime + polling + optimistic send never double-post.
+
+## New files
+
+- `supabase/migrations/0001_support_chat.sql`
+- `src/lib/supabase/browser.ts` — anon client (realtime only)
+- `src/lib/support.ts` — server-side chat service
+- `src/lib/useSupportChat.ts` — realtime + polling React hook
+- `src/components/support/SupportWidget.tsx` — customer widget
+- `src/components/admin/SupportInbox.tsx` — admin inbox list
+- `src/components/admin/SupportThread.tsx` — admin conversation view
+- `src/app/api/support/route.ts` — GET conversation + messages
+- `src/app/api/support/messages/route.ts` — POST user message
+- `src/app/api/support/read/route.ts` — POST mark-read
+- `src/app/api/admin/support/route.ts` — GET inbox list
+- `src/app/api/admin/support/[userId]/route.ts` — GET thread / POST reply
+- `src/app/admin/support/page.tsx`, `src/app/admin/support/[userId]/page.tsx`
+
+## Modified files
+
+- `supabase/schema.sql` — chat tables, realtime publication,
+  `support_reply` notification kind
+- `src/lib/notify.ts` — `support_reply` kind
+- `src/app/dashboard/layout.tsx` — mounts `<SupportWidget />`
+- `src/components/admin/AdminSidebar.tsx` — "Support" nav + unread badge,
+  logout now uses hard navigation
+
+## Verified
+
+- `npx tsc --noEmit` — zero errors
+- `npx next build` — clean; `/admin/support` and `/admin/support/[userId]`
+  and all `/api/support*` routes compile
+
+
+---
+
+# Admin layout fix — all content visible on every screen
+
+The admin tables were wrapped in `overflow-hidden`, so on any screen
+narrower than the table, columns were clipped with no way to reach
+them. Quick, robust fix: nothing is ever clipped now — it scrolls.
+
+## Changes
+- `src/app/admin/users/page.tsx`,
+  `src/app/admin/transactions/page.tsx`,
+  `src/app/admin/transfers/page.tsx` — table card wrapper changed from
+  `overflow-hidden` to `overflow-x-auto`; tables given `min-w-[720px]`
+  so columns keep their width and the container scrolls horizontally
+  instead of crushing or clipping.
+- `src/app/admin/applications/page.tsx` — same `overflow-hidden` →
+  `overflow-x-auto`.
+- `src/app/admin/layout.tsx` — `<main>` now `overflow-x-auto
+  max-w-full` so any wide child (deep tables, the support thread) is
+  always reachable on phones and small laptops.
+- `src/components/admin/AdminTopbar.tsx` — (1) imports `SessionUser`
+  from `@/lib/auth-types` instead of the server-only `@/lib/auth`
+  (same client/server crash class fixed earlier for the dashboard);
+  (2) header now wraps instead of clipping a long email + status pill
+  on narrow screens.
+
+## Verified
+- `npx tsc --noEmit` — zero errors
+- `npx next build` — clean compile
