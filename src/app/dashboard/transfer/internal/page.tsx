@@ -4,9 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Users } from "lucide-react";
 import Link from "next/link";
+import { TransferOtpModal } from "@/components/dashboard/TransferOtpModal";
+import { useTransferOtp } from "@/lib/useTransferOtp";
 
 export default function InternalPage() {
   const router = useRouter();
+  const otp = useTransferOtp();
   const [amount, setAmount] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -19,20 +22,15 @@ export default function InternalPage() {
     setErr(null);
     setLoading(true);
     try {
-      const r = await fetch("/api/transfers", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          rail: "internal",
-          amount: Number(amount.replace(",", ".")),
-          beneficiary_name: name || email,
-          beneficiary_email: email,
-          reference,
-        }),
+      const okStarted = await otp.begin({
+        rail: "internal",
+        amount: Number(amount.replace(",", ".")),
+        currency: "EUR",
+        beneficiary_name: name || email,
+        beneficiary_email: email,
+        reference,
       });
-      const d = await r.json();
-      if (!r.ok || !d.ok) throw new Error(d.error || "Transfer failed");
-      router.push(`/dashboard/transfer/success?ref=${d.transfer.reference_id}`);
+      if (!okStarted) setErr(otp.error || "Could not start authorisation");
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -122,6 +120,17 @@ export default function InternalPage() {
           </button>
         </div>
       </form>
+
+      <TransferOtpModal
+        {...otp.modalProps}
+        onSubmit={(code) =>
+          otp.confirm(code, (d) =>
+            router.push(
+              `/dashboard/transfer/success?ref=${d.transfer.reference_id}`
+            )
+          )
+        }
+      />
     </div>
   );
 }

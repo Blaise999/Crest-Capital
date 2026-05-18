@@ -23,8 +23,11 @@ export type TransferEmailPayload = {
 };
 
 const BRAND = {
-  green: "#15a586",
-  greenDark: "#0d7a63",
+  // Real Crest Capital brand — matches /public/logo.svg
+  brand: "#2f66ff",
+  brandDark: "#0c2672",
+  green: "#2f66ff", // kept as alias so existing references stay valid
+  greenDark: "#0c2672",
   ink900: "#0a0c10",
   ink700: "#3d4753",
   ink500: "#6b7686",
@@ -40,9 +43,20 @@ const BRAND = {
   blueFg: "#1a4bf0",
   redBg: "#fdecec",
   redFg: "#a11a1a",
-  greenBg: "#e6f7f2",
-  greenFg: "#0d7a63",
+  greenBg: "#e9f0ff",
+  greenFg: "#1a4bf0",
 };
+
+/**
+ * The Crest Capital logo, inlined as a base64 data URI so it renders without
+ * an external image host. Apple Mail / iOS Mail / most webmail render data
+ * URIs; Outlook (mso) ignores them, so the shell provides an mso fallback.
+ * This is the exact artwork from /public/logo.svg.
+ */
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><defs><linearGradient id="cc" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2f66ff"/><stop offset="100%" stop-color="#0c2672"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#cc)"/><path d="M11 47 L24 28 L32 37 L42 21 L53 47 Z" fill="#ffffff" opacity="0.95"/><path d="M24 28 L32 37 L28 42 L20 35 Z" fill="#ffffff" opacity="0.55"/><circle cx="47" cy="18" r="2.4" fill="#ffffff"/></svg>`;
+
+const LOGO_DATA_URI =
+  "data:image/svg+xml;base64," + Buffer.from(LOGO_SVG).toString("base64");
 
 function escape(s: string) {
   return String(s ?? "").replace(/[&<>"']/g, (m) =>
@@ -110,13 +124,22 @@ function shell({
       ${accentBar}
 
       <!-- Brand bar -->
-      <tr><td style="padding:24px 32px 0 32px;">
+      <tr><td style="padding:26px 32px 0 32px;">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0">
           <tr>
-            <td style="padding-right:10px;vertical-align:middle;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="width:32px;height:32px;background:${BRAND.green};border-radius:9px;line-height:32px;text-align:center;color:#fff;font-weight:800;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif;">C</td></tr></table>
+            <td style="padding-right:11px;vertical-align:middle;">
+              <!--[if !mso]><!-->
+              <img src="${LOGO_DATA_URI}" width="36" height="36" alt="Crest Capital"
+                   style="display:block;width:36px;height:36px;border-radius:10px;" />
+              <!--<![endif]-->
+              <!--[if mso]>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr><td style="width:36px;height:36px;background:${BRAND.brand};border-radius:10px;line-height:36px;text-align:center;color:#fff;font-weight:800;font-size:16px;font-family:Arial,sans-serif;">C</td></tr></table>
+              <![endif]-->
             </td>
-            <td style="vertical-align:middle;font-weight:700;font-size:17px;letter-spacing:-0.01em;color:${BRAND.ink900};">Crest Capital</td>
+            <td style="vertical-align:middle;">
+              <div style="font-weight:800;font-size:18px;letter-spacing:-0.02em;color:${BRAND.ink900};line-height:1;">Crest Capital</div>
+              <div style="margin-top:3px;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:${BRAND.ink400};line-height:1;">Finance at its peak</div>
+            </td>
           </tr>
         </table>
       </td></tr>
@@ -307,30 +330,76 @@ export function accountUnblockedTemplate({ firstName }: { firstName: string }) {
 
 /* -------------------------- OTP ------------------------------------------ */
 
-export function otpTemplate({ code, purpose }: { code: string; purpose: "login" | "password_reset" }) {
-  const title = purpose === "login" ? "Your sign-in code" : "Reset your password";
+export function otpTemplate({
+  code,
+  purpose,
+  context,
+}: {
+  code: string;
+  purpose: "login" | "password_reset" | "transfer";
+  context?: { amount?: string; beneficiary?: string };
+}) {
+  const title =
+    purpose === "login"
+      ? "Your sign-in code"
+      : purpose === "transfer"
+      ? "Authorise your transfer"
+      : "Reset your password";
+
   const body =
     purpose === "login"
       ? "Enter this 6-digit code to finish signing in to Crest Capital."
+      : purpose === "transfer"
+      ? "For your security, confirm this payment by entering the 6-digit code below in the app. The transfer will not be sent until you do."
       : "Enter this 6-digit code to set a new password on your Crest Capital account.";
 
   // Spaced groups: "123 456" — easier to read & retype.
   const safe = String(code || "").replace(/\D/g, "").slice(0, 6);
   const display = safe.length === 6 ? `${safe.slice(0, 3)} ${safe.slice(3)}` : safe;
 
+  const txnCard =
+    purpose === "transfer" && context
+      ? card(
+          [
+            context.amount ? (["Amount", context.amount] as [string, string]) : null,
+            context.beneficiary
+              ? (["To", context.beneficiary] as [string, string])
+              : null,
+          ].filter(Boolean) as [string, string][]
+        )
+      : "";
+
   return shell({
+    accent:
+      purpose === "transfer"
+        ? { color: BRAND.brand, label: "Authorise" }
+        : undefined,
     inner: `
-    ${eyebrow(purpose === "login" ? "Sign-in" : "Password reset")}
+    ${eyebrow(
+      purpose === "login"
+        ? "Sign-in"
+        : purpose === "transfer"
+        ? "Payment authorisation"
+        : "Password reset"
+    )}
     ${h1(title)}
     ${p(body)}
+    ${txnCard}
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:18px 0;">
       <tr><td align="center">
         <div style="display:inline-block;background:${BRAND.bg};border:1px solid ${BRAND.ink200};border-radius:14px;padding:18px 28px;font-size:34px;letter-spacing:0.18em;font-weight:800;color:${BRAND.ink900};font-family:'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;">${escape(display)}</div>
       </td></tr>
     </table>
-    ${muted("This code expires in 10 minutes. If you didn't request it, you can safely ignore this email — no changes will be made to your account.")}
+    ${muted(
+      purpose === "transfer"
+        ? "This code expires in 10 minutes. If you didn't start this payment, do NOT share this code — contact support@crestcapital.com immediately and your account will be secured."
+        : "This code expires in 10 minutes. If you didn't request it, you can safely ignore this email — no changes will be made to your account."
+    )}
     `,
-    preheader: `${title} — code expires in 10 minutes.`,
+    preheader:
+      purpose === "transfer"
+        ? `Authorise your transfer — code ${display} (expires in 10 minutes).`
+        : `${title} — code expires in 10 minutes.`,
   });
 }
 
@@ -419,12 +488,26 @@ export function receiptTemplate(p_: ReceiptPayload) {
   if (p_.reference_note) benRows.push(["Reference", p_.reference_note]);
 
   return shell({
-    accent: { color: BRAND.green, label: "Receipt" },
+    accent: { color: BRAND.brand, label: "Receipt" },
     inner: `
-    ${eyebrow("Payment receipt", BRAND.greenFg)}
-    ${h1("Payment receipt")}
-    ${p(`Hi ${escape(p_.firstName)}, here's your official receipt for the transfer below. Please keep this email for your records.`)}
-    ${amountBlock(p_.amount, p_.currency, `paid to ${p_.beneficiaryName}`)}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0 18px 0;background:linear-gradient(135deg,${BRAND.brand},${BRAND.brandDark});border-radius:14px;">
+      <tr><td style="padding:20px 22px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+          <tr>
+            <td style="vertical-align:middle;">
+              <div style="font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.75);">Official payment receipt</div>
+              <div style="margin-top:6px;font-size:24px;font-weight:800;letter-spacing:-0.02em;color:#ffffff;line-height:1.1;">${escape(fmt(p_.amount, p_.currency))}</div>
+              <div style="margin-top:3px;font-size:12.5px;color:rgba(255,255,255,0.8);">paid to ${escape(p_.beneficiaryName)}</div>
+            </td>
+            <td style="vertical-align:middle;text-align:right;">
+              <img src="${LOGO_DATA_URI}" width="44" height="44" alt="Crest Capital" style="display:inline-block;width:44px;height:44px;border-radius:11px;" />
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    ${p(`Hi ${escape(p_.firstName)}, your transfer has settled. This is your official receipt — please keep it for your records. You can show this email or your in-app receipt as proof of payment.`)}
 
     ${eyebrow("Transaction")}
     ${card(txnRows)}
@@ -436,7 +519,7 @@ export function receiptTemplate(p_: ReceiptPayload) {
     ${card(benRows)}
 
     <p style="margin:6px 0 0 0;">${badge("Settled", BRAND.greenBg, BRAND.greenFg)}</p>
-    ${muted(`Receipt number ${escape(p_.reference)}. Crest Capital AG is supervised by BaFin and the Deutsche Bundesbank.`)}
+    ${muted(`Receipt number ${escape(p_.reference)}. Crest Capital AG, Friedrichstraße 1, 10117 Berlin — supervised by BaFin and the Deutsche Bundesbank. This receipt was generated automatically and is valid without a signature.`)}
     `,
     preheader: `Receipt ${p_.reference} — ${fmt(p_.amount, p_.currency)} to ${p_.beneficiaryName}.`,
   });

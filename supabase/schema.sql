@@ -213,7 +213,7 @@ create table if not exists public.otp_codes (
   id          uuid primary key default uuid_generate_v4(),
   email       text not null,
   code_hash   text not null,
-  purpose     text not null check (purpose in ('login','password_reset')),
+  purpose     text not null check (purpose in ('login','password_reset','transfer')),
   expires_at  timestamptz not null,
   used_at     timestamptz,
   created_at  timestamptz not null default now()
@@ -264,7 +264,8 @@ create table if not exists public.support_messages (
   sender_id       uuid references public.users(id),
   sender_name     text,
 
-  body            text not null check (char_length(body) between 1 and 4000),
+  body            text not null default '' check (char_length(body) <= 4000),
+  image_url       text,
 
   read_by_user    boolean not null default false,
   read_by_admin   boolean not null default false,
@@ -349,6 +350,29 @@ alter publication supabase_realtime add table public.support_conversations;
 -- Ensure full row data is delivered on UPDATE/DELETE events
 alter table public.support_messages      replica identity full;
 alter table public.support_conversations replica identity full;
+
+-- ----------------------------------------------------------------------------
+-- STORAGE — support chat image attachments
+-- Public-read bucket. Uploads are performed server-side with the
+-- service-role key, so no INSERT policy is needed for the anon role.
+-- ----------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('support-attachments', 'support-attachments', true)
+on conflict (id) do nothing;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'support_attachments_public_read'
+  ) then
+    create policy "support_attachments_public_read"
+      on storage.objects for select
+      using (bucket_id = 'support-attachments');
+  end if;
+end$$;
 
 -- ----------------------------------------------------------------------------
 -- SEED — admin Valentine Nonny

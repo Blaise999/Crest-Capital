@@ -11,14 +11,17 @@ export type ChatMessage = {
   sender_id: string | null;
   sender_name: string | null;
   body: string;
+  image_url: string | null;
   created_at: string;
 };
 
 type UseSupportChatArgs = {
   /** API endpoint that returns { conversation, messages, serverTime } */
   endpoint: string;
-  /** API endpoint that accepts POST { body } to send a message */
+  /** API endpoint that accepts POST { body, imageUrl } to send a message */
   sendEndpoint: string;
+  /** API endpoint that accepts multipart POST (field "file") → { url } */
+  uploadEndpoint: string;
   /** poll interval (ms) when realtime is unavailable */
   pollMs?: number;
 };
@@ -36,6 +39,7 @@ type UseSupportChatArgs = {
 export function useSupportChat({
   endpoint,
   sendEndpoint,
+  uploadEndpoint,
   pollMs = 4000,
 }: UseSupportChatArgs) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -43,6 +47,7 @@ export function useSupportChat({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [live, setLive] = useState(false);
 
   const lastTsRef = useRef<string | null>(null);
@@ -125,9 +130,9 @@ export function useSupportChat({
   }, [endpoint, mergeIn]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, imageUrl?: string | null) => {
       const body = text.trim();
-      if (!body || sending) return false;
+      if ((!body && !imageUrl) || sending) return false;
       setSending(true);
       setError(null);
       try {
@@ -135,7 +140,7 @@ export function useSupportChat({
           method: "POST",
           headers: { "content-type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ body }),
+          body: JSON.stringify({ body, imageUrl: imageUrl || undefined }),
         });
         const raw = await r.text();
         let d: any = {};
@@ -155,6 +160,53 @@ export function useSupportChat({
       }
     },
     [sendEndpoint, sending, mergeIn]
+  );
+
+  /**
+   * Upload an image file, then post it as a message (optionally with a
+   * caption). Returns true on success.
+   */
+  const sendImage = useCallback(
+    async (file: File, caption?: string) => {
+      if (uploading || sending) return false;
+      if (!file.type.startsWith("image/")) {
+        setError("Only image files can be attached.");
+        return false;
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        setError("Image is too large (max 8 MB).");
+        return false;
+      }
+      setUploading(true);
+      setError(null);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const r = await fetch(uploadEndpoint, {
+          method: "POST",
+          credentials: "same-origin",
+          body: fd,
+        });
+        const raw = await r.text();
+        let d: any = {};
+        try {
+          d = raw ? JSON.parse(raw) : {};
+        } catch {
+          throw new Error("Unexpected server response");
+        }
+        if (!r.ok || !d.ok || !d.url) {
+          throw new Error(d.error || "Could not upload the image");
+        }
+        // chain into a normal message send carrying the image URL
+        return await send(caption || "", d.url);
+      } catch (e: any) {
+        setError(e?.message || "Could not upload the image");
+        return false;
+      } finally {
+        setUploading(false);
+      }
+    },
+    [uploadEndpoint, uploading, sending, send]
   );
 
   useEffect(() => {
@@ -215,9 +267,11 @@ export function useSupportChat({
     conversationId,
     loading,
     sending,
+    uploading,
     error,
     live,
     send,
+    sendImage,
     reload: loadInitial,
   };
 }

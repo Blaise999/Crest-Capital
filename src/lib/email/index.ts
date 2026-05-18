@@ -106,11 +106,19 @@ export async function sendAccountUnblocked(to: string, firstName: string) {
 export async function sendReceipt(to: string, p: ReceiptPayload) {
   return send(to, `Receipt — ${p.reference}`, receiptTemplate(p));
 }
-export async function sendOtp(to: string, code: string, purpose: "login" | "password_reset") {
-  const subject = purpose === "login"
-    ? "Your Crest Capital sign-in code"
-    : "Reset your Crest Capital password";
-  return send(to, subject, otpTemplate({ code, purpose }));
+export async function sendOtp(
+  to: string,
+  code: string,
+  purpose: "login" | "password_reset" | "transfer",
+  context?: { amount?: string; beneficiary?: string }
+) {
+  const subject =
+    purpose === "login"
+      ? "Your Crest Capital sign-in code"
+      : purpose === "transfer"
+      ? "Authorise your Crest Capital transfer"
+      : "Reset your Crest Capital password";
+  return send(to, subject, otpTemplate({ code, purpose, context }));
 }
 export async function sendOnboardingApproved(to: string, firstName: string, iban?: string) {
   return send(to, "Welcome to Crest Capital — your account is open", onboardingApprovedTemplate({ firstName, iban }));

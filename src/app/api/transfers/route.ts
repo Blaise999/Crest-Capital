@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ok, fail, handleError } from "@/lib/http";
 import { genReference, fmtMoney } from "@/lib/utils";
 import { sendTransferSubmitted, deferEmail } from "@/lib/email";
+import { verifyOtp } from "@/lib/otp";
 import { notify } from "@/lib/notify";
 
 const ALLOWED_RAILS = ["sepa", "sepa_instant", "internal", "swift"] as const;
@@ -44,7 +45,30 @@ export async function POST(req: NextRequest) {
       intermediary_bank,
       reference,
       memo,
+      otp,
     } = body || {};
+
+    // ── Bank-style authorisation gate ──────────────────────────────────────
+    // The transfer is only created if the user supplies a valid, unused
+    // 6-digit code that we emailed them via POST /api/transfers/otp.
+    const code = String(otp || "").replace(/\D/g, "");
+    if (code.length !== 6) {
+      return fail(401, "Enter the 6-digit code we emailed you to authorise this transfer.");
+    }
+
+    const sbAuth = supabaseAdmin();
+    const { data: authUser } = await sbAuth
+      .from("users")
+      .select("email")
+      .eq("id", u.id)
+      .single();
+    if (!authUser) return fail(500, "Account not found");
+
+    const otpOk = await verifyOtp(authUser.email, code, "transfer");
+    if (!otpOk) {
+      return fail(401, "That authorisation code is invalid or has expired. Request a new one.");
+    }
+    // ───────────────────────────────────────────────────────────────────────
 
     const accType = account_type === "savings" ? "savings" : "checking";
     if (!ALLOWED_RAILS.includes(rail)) return fail(400, "Invalid rail");

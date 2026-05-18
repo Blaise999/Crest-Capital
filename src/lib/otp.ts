@@ -7,7 +7,7 @@ export function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-export async function storeOtp(email: string, code: string, purpose: "login" | "password_reset") {
+export async function storeOtp(email: string, code: string, purpose: "login" | "password_reset" | "transfer") {
   const sb = supabaseAdmin();
   const code_hash = await bcrypt.hash(code, 8);
   const expires_at = new Date(Date.now() + OTP_TTL_MINUTES * 60_000).toISOString();
@@ -34,7 +34,7 @@ export async function storeOtp(email: string, code: string, purpose: "login" | "
 export async function verifyOtp(
   email: string,
   code: string,
-  purpose: "login" | "password_reset"
+  purpose: "login" | "password_reset" | "transfer"
 ): Promise<boolean> {
   const devBypass = !process.env.RESEND_API_KEY && code === "000000";
 

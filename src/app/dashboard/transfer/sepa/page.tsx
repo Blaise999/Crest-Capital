@@ -4,11 +4,14 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Zap, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { TransferOtpModal } from "@/components/dashboard/TransferOtpModal";
+import { useTransferOtp } from "@/lib/useTransferOtp";
 
 export default function SepaPage() {
   const router = useRouter();
   const sp = useSearchParams();
   const instant = sp.get("instant") === "1";
+  const otp = useTransferOtp();
 
   const [amount, setAmount] = useState("");
   const [name, setName] = useState("");
@@ -23,21 +26,16 @@ export default function SepaPage() {
     setErr(null);
     setLoading(true);
     try {
-      const r = await fetch("/api/transfers", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          rail: instant ? "sepa_instant" : "sepa",
-          amount: Number(amount.replace(",", ".")),
-          beneficiary_name: name,
-          beneficiary_iban: iban.replace(/\s+/g, ""),
-          beneficiary_bic: bic || undefined,
-          reference,
-        }),
+      const okStarted = await otp.begin({
+        rail: instant ? "sepa_instant" : "sepa",
+        amount: Number(amount.replace(",", ".")),
+        currency: "EUR",
+        beneficiary_name: name,
+        beneficiary_iban: iban.replace(/\s+/g, ""),
+        beneficiary_bic: bic || undefined,
+        reference,
       });
-      const d = await r.json();
-      if (!r.ok || !d.ok) throw new Error(d.error || "Transfer failed");
-      router.push(`/dashboard/transfer/success?ref=${d.transfer.reference_id}`);
+      if (!okStarted) setErr(otp.error || "Could not start authorisation");
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -144,6 +142,17 @@ export default function SepaPage() {
           Transfers are reviewed by our compliance team before they settle.
         </p>
       </form>
+
+      <TransferOtpModal
+        {...otp.modalProps}
+        onSubmit={(code) =>
+          otp.confirm(code, (d) =>
+            router.push(
+              `/dashboard/transfer/success?ref=${d.transfer.reference_id}`
+            )
+          )
+        }
+      />
     </div>
   );
 }

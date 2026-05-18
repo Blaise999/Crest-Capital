@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, X, Send, Loader2, Headset } from "lucide-react";
+import {
+  MessageCircle,
+  X,
+  Send,
+  Loader2,
+  Headset,
+  ImagePlus,
+} from "lucide-react";
 import { useSupportChat } from "@/lib/useSupportChat";
 import { cx } from "@/lib/utils";
 
@@ -21,10 +28,21 @@ export function SupportWidget() {
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const { messages, loading, sending, error, live, send } = useSupportChat({
+  const {
+    messages,
+    loading,
+    sending,
+    uploading,
+    error,
+    live,
+    send,
+    sendImage,
+  } = useSupportChat({
     endpoint: "/api/support",
     sendEndpoint: "/api/support/messages",
+    uploadEndpoint: "/api/support/upload",
   });
 
   const lastAdminAt = (() => {
@@ -161,13 +179,38 @@ export function SupportWidget() {
                       )}
                       <div
                         className={cx(
-                          "rounded-2xl px-3.5 py-2 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words",
+                          "rounded-2xl text-[13.5px] leading-relaxed break-words overflow-hidden",
+                          m.image_url ? "p-1" : "px-3.5 py-2 whitespace-pre-wrap",
                           mine
                             ? "bg-brand-500 text-white rounded-br-md"
                             : "bg-white text-ink-900 border border-ink-100 rounded-bl-md"
                         )}
                       >
-                        {m.body}
+                        {m.image_url && (
+                          <a
+                            href={m.image_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={m.image_url}
+                              alt="attachment"
+                              className="rounded-xl max-h-60 w-auto object-cover"
+                              loading="lazy"
+                            />
+                          </a>
+                        )}
+                        {m.body && (
+                          <div
+                            className={cx(
+                              m.image_url ? "px-2.5 py-1.5 whitespace-pre-wrap" : ""
+                            )}
+                          >
+                            {m.body}
+                          </div>
+                        )}
                       </div>
                       <div
                         className={cx(
@@ -189,7 +232,35 @@ export function SupportWidget() {
             {error && (
               <div className="mb-2 text-[12px] text-red-600">{error}</div>
             )}
+            {uploading && (
+              <div className="mb-2 text-[12px] text-ink-500 inline-flex items-center gap-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Uploading image…
+              </div>
+            )}
             <div className="flex items-end gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (f) await sendImage(f, draft);
+                  setDraft("");
+                  if (fileRef.current) fileRef.current.value = "";
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading || sending}
+                className="h-10 w-10 shrink-0 rounded-xl border border-ink-200 text-ink-500 grid place-items-center hover:bg-ink-50 disabled:opacity-50"
+                aria-label="Attach image"
+                title="Attach an image"
+              >
+                <ImagePlus className="h-4 w-4" />
+              </button>
               <textarea
                 ref={inputRef}
                 value={draft}
@@ -206,7 +277,7 @@ export function SupportWidget() {
               />
               <button
                 onClick={submit}
-                disabled={sending || !draft.trim()}
+                disabled={sending || uploading || !draft.trim()}
                 className="h-10 w-10 shrink-0 rounded-xl bg-brand-500 text-white grid place-items-center disabled:opacity-50 hover:bg-brand-600"
                 aria-label="Send"
               >

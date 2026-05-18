@@ -4,11 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Globe2, Loader2 } from "lucide-react";
+import { TransferOtpModal } from "@/components/dashboard/TransferOtpModal";
+import { useTransferOtp } from "@/lib/useTransferOtp";
 
 const CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "NOK", "DKK", "JPY", "AUD", "CAD", "AED"];
 
 export default function InternationalPage() {
   const router = useRouter();
+  const otp = useTransferOtp();
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("EUR");
   const [name, setName] = useState("");
@@ -26,25 +29,19 @@ export default function InternationalPage() {
     setErr(null);
     setLoading(true);
     try {
-      const r = await fetch("/api/transfers", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          rail: "swift",
-          amount: Number(amount.replace(",", ".")),
-          currency,
-          beneficiary_name: name,
-          beneficiary_iban: iban.replace(/\s+/g, ""),
-          beneficiary_bic: bic.replace(/\s+/g, ""),
-          beneficiary_country: country,
-          beneficiary_address: address || undefined,
-          intermediary_bank: intermediary || undefined,
-          reference,
-        }),
+      const okStarted = await otp.begin({
+        rail: "swift",
+        amount: Number(amount.replace(",", ".")),
+        currency,
+        beneficiary_name: name,
+        beneficiary_iban: iban.replace(/\s+/g, ""),
+        beneficiary_bic: bic.replace(/\s+/g, ""),
+        beneficiary_country: country,
+        beneficiary_address: address || undefined,
+        intermediary_bank: intermediary || undefined,
+        reference,
       });
-      const d = await r.json();
-      if (!r.ok || !d.ok) throw new Error(d.error || "Transfer failed");
-      router.push(`/dashboard/transfer/success?ref=${d.transfer.reference_id}`);
+      if (!okStarted) setErr(otp.error || "Could not start authorisation");
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -160,6 +157,17 @@ export default function InternationalPage() {
         }
         .input:focus { border-color: #2f66ff; box-shadow: 0 0 0 1px #2f66ff; }
       `}</style>
+
+      <TransferOtpModal
+        {...otp.modalProps}
+        onSubmit={(code) =>
+          otp.confirm(code, (d) =>
+            router.push(
+              `/dashboard/transfer/success?ref=${d.transfer.reference_id}`
+            )
+          )
+        }
+      />
     </div>
   );
 }

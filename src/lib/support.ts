@@ -11,6 +11,7 @@ export type SupportMessage = {
   sender_id: string | null;
   sender_name: string | null;
   body: string;
+  image_url: string | null;
   read_by_user: boolean;
   read_by_admin: boolean;
   created_at: string;
@@ -96,9 +97,13 @@ export async function postMessage(args: {
   senderId: string | null;
   senderName: string | null;
   body: string;
+  imageUrl?: string | null;
 }): Promise<SupportMessage> {
   const body = args.body.trim();
-  if (!body) throw new Error("Message cannot be empty");
+  const imageUrl = args.imageUrl || null;
+  if (!body && !imageUrl) {
+    throw new Error("Message cannot be empty");
+  }
   if (body.length > 4000) throw new Error("Message is too long (max 4000 chars)");
 
   const sb = supabaseAdmin();
@@ -113,6 +118,7 @@ export async function postMessage(args: {
       sender_id: args.senderId,
       sender_name: args.senderName,
       body,
+      image_url: imageUrl,
       read_by_user: args.sender === "user",
       read_by_admin: args.sender === "admin",
     })
@@ -123,9 +129,11 @@ export async function postMessage(args: {
     throw new Error(error?.message || "Could not send the message");
   }
 
+  const summary = body ? body.slice(0, 280) : "📷 Photo";
+
   // Update conversation summary + bump the *other* side's unread counter.
   const patch: Record<string, any> = {
-    last_message: body.slice(0, 280),
+    last_message: summary,
     last_message_at: msg.created_at,
     last_sender: args.sender,
     status: "open",
@@ -148,7 +156,7 @@ export async function postMessage(args: {
       args.userId,
       "support_reply",
       "New reply from Crest Capital support",
-      body.slice(0, 140),
+      summary.slice(0, 140),
       { conversation_id: convo.id }
     );
   }
@@ -223,4 +231,58 @@ export async function listConversationsForAdmin(): Promise<
   }
 
   return list.map((c) => ({ ...c, user: users[c.user_id] || null }));
+}
+
+const SUPPORT_BUCKET = "support-attachments";
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
+const ALLOWED_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+]);
+
+/**
+ * Upload a support attachment (image) and return its public URL.
+ * Uploads run server-side with the service-role key, so the bucket needs
+ * no anon INSERT policy — only public read (set in the schema/migration).
+ */
+export async function uploadSupportImage(args: {
+  userId: string;
+  fileName: string;
+  contentType: string;
+  bytes: Buffer;
+}): Promise<string> {
+  if (!ALLOWED_TYPES.has(args.contentType)) {
+    throw new Error("Unsupported image type. Use PNG, JPG, WEBP or GIF.");
+  }
+  if (args.bytes.byteLength > MAX_IMAGE_BYTES) {
+    throw new Error("Image is too large (max 8 MB).");
+  }
+
+  const sb = supabaseAdmin();
+  const ext =
+    (args.fileName.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "") ||
+    "jpg";
+  const path = `${args.userId}/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}.${ext}`;
+
+  const { error } = await sb.storage
+    .from(SUPPORT_BUCKET)
+    .upload(path, args.bytes, {
+      contentType: args.contentType,
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(error.message || "Could not upload the image");
+  }
+
+  const { data } = sb.storage.from(SUPPORT_BUCKET).getPublicUrl(path);
+  if (!data?.publicUrl) {
+    throw new Error("Could not resolve the uploaded image URL");
+  }
+  return data.publicUrl;
 }

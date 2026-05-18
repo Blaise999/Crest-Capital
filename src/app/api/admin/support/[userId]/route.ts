@@ -53,8 +53,8 @@ export async function GET(
 
 /**
  * POST /api/admin/support/:userId
- * body: { body: string }
- * Admin replies to the customer.
+ * body: { body?: string, imageUrl?: string }
+ * Admin replies to the customer (text and/or image).
  */
 export async function POST(
   req: Request,
@@ -65,7 +65,12 @@ export async function POST(
     const { userId } = await params;
     const json = await req.json().catch(() => ({}));
     const body = typeof json?.body === "string" ? json.body : "";
-    if (!body.trim()) return fail(400, "Message cannot be empty");
+    const imageUrl =
+      typeof json?.imageUrl === "string" && json.imageUrl ? json.imageUrl : null;
+
+    if (!body.trim() && !imageUrl) {
+      return fail(400, "Message cannot be empty");
+    }
 
     const adminName =
       [admin.first_name, admin.last_name].filter(Boolean).join(" ").trim() ||
@@ -77,6 +82,7 @@ export async function POST(
       senderId: admin.id,
       senderName: adminName,
       body,
+      imageUrl,
     });
 
     return ok({ message: msg });
