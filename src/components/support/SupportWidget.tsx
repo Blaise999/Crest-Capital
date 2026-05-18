@@ -98,7 +98,12 @@ export function SupportWidget() {
           "bg-gradient-to-br from-brand-500 to-brand-600"
         )}
       >
-        {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+        {open ? (
+          <X className="h-6 w-6" />
+        ) : (
+          <MessageCircle className="h-6 w-6" />
+        )}
+
         {unread && (
           <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 ring-2 ring-white" />
         )}
@@ -116,8 +121,12 @@ export function SupportWidget() {
             <div className="h-9 w-9 rounded-full bg-white/15 grid place-items-center">
               <Headset className="h-4.5 w-4.5" />
             </div>
+
             <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-semibold">Crest Capital Support</div>
+              <div className="text-[14px] font-semibold">
+                Crest Capital Support
+              </div>
+
               <div className="text-[11.5px] text-white/70 flex items-center gap-1.5">
                 <span
                   className={cx(
@@ -125,9 +134,12 @@ export function SupportWidget() {
                     live ? "bg-emerald-400" : "bg-amber-400"
                   )}
                 />
-                {live ? "Live · we usually reply in minutes" : "We usually reply in minutes"}
+                {live
+                  ? "Live · we usually reply in minutes"
+                  : "We usually reply in minutes"}
               </div>
             </div>
+
             <button
               onClick={() => setOpen(false)}
               className="h-8 w-8 grid place-items-center rounded-full hover:bg-white/10"
@@ -145,7 +157,8 @@ export function SupportWidget() {
             {loading ? (
               <div className="h-full grid place-items-center text-ink-400 text-[13px]">
                 <span className="inline-flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading…
                 </span>
               </div>
             ) : messages.length === 0 ? (
@@ -154,33 +167,39 @@ export function SupportWidget() {
                   <div className="mx-auto h-12 w-12 rounded-2xl bg-brand-500/10 text-brand-600 grid place-items-center">
                     <MessageCircle className="h-6 w-6" />
                   </div>
+
                   <p className="mt-3 text-[13.5px] font-semibold text-ink-900">
                     How can we help?
                   </p>
+
                   <p className="mt-1 text-[12.5px] text-ink-500">
-                    Send us a message and a Crest Capital agent will reply
-                    here. You&apos;ll also get a notification.
+                    Send us a message and a Crest Capital agent will reply here.
+                    You&apos;ll also get a notification.
                   </p>
                 </div>
               </div>
             ) : (
               messages.map((m) => {
                 const mine = m.sender === "user";
+
                 return (
                   <div
                     key={m.id}
                     className={cx("flex", mine ? "justify-end" : "justify-start")}
                   >
-                    <div className={cx("max-w-[78%]")}>
+                    <div className="max-w-[78%]">
                       {!mine && (
                         <div className="text-[10.5px] font-semibold text-ink-500 mb-0.5 ml-1">
                           {m.sender_name || "Support"}
                         </div>
                       )}
+
                       <div
                         className={cx(
                           "rounded-2xl text-[13.5px] leading-relaxed break-words overflow-hidden",
-                          m.image_url ? "p-1" : "px-3.5 py-2 whitespace-pre-wrap",
+                          m.image_url
+                            ? "p-1"
+                            : "px-3.5 py-2 whitespace-pre-wrap",
                           mine
                             ? "bg-brand-500 text-white rounded-br-md"
                             : "bg-white text-ink-900 border border-ink-100 rounded-bl-md"
@@ -202,16 +221,20 @@ export function SupportWidget() {
                             />
                           </a>
                         )}
+
                         {m.body && (
                           <div
                             className={cx(
-                              m.image_url ? "px-2.5 py-1.5 whitespace-pre-wrap" : ""
+                              m.image_url
+                                ? "px-2.5 py-1.5 whitespace-pre-wrap"
+                                : ""
                             )}
                           >
                             {m.body}
                           </div>
                         )}
                       </div>
+
                       <div
                         className={cx(
                           "text-[10px] text-ink-400 mt-0.5",
@@ -232,13 +255,15 @@ export function SupportWidget() {
             {error && (
               <div className="mb-2 text-[12px] text-red-600">{error}</div>
             )}
+
             {uploading && (
               <div className="mb-2 text-[12px] text-ink-500 inline-flex items-center gap-1.5">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Uploading image…
               </div>
             )}
-            <div className="flex items-end gap-2">
+
+            <div className="flex items-end gap-1.5">
               <input
                 ref={fileRef}
                 type="file"
@@ -251,16 +276,18 @@ export function SupportWidget() {
                   if (fileRef.current) fileRef.current.value = "";
                 }}
               />
+
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading || sending}
-                className="h-10 w-10 shrink-0 rounded-xl border border-ink-200 text-ink-500 grid place-items-center hover:bg-ink-50 disabled:opacity-50"
+                className="h-9 w-9 shrink-0 rounded-full text-ink-400/70 grid place-items-center hover:text-ink-600 hover:bg-ink-100/60 disabled:opacity-40 transition-colors"
                 aria-label="Attach image"
-                title="Attach an image"
+                title="Attach image"
               >
-                <ImagePlus className="h-4 w-4" />
+                <ImagePlus className="h-[17px] w-[17px]" strokeWidth={1.8} />
               </button>
+
               <textarea
                 ref={inputRef}
                 value={draft}
@@ -275,6 +302,7 @@ export function SupportWidget() {
                 placeholder="Type a message…"
                 className="flex-1 resize-none max-h-28 rounded-xl border border-ink-200 bg-white px-3 py-2.5 text-[13.5px] outline-none focus:border-brand-500"
               />
+
               <button
                 onClick={submit}
                 disabled={sending || uploading || !draft.trim()}
