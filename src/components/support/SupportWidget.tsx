@@ -7,7 +7,6 @@ import {
   Send,
   Loader2,
   Headset,
-  ImagePlus,
 } from "lucide-react";
 import { useSupportChat } from "@/lib/useSupportChat";
 import { cx } from "@/lib/utils";
@@ -281,11 +280,11 @@ export function SupportWidget() {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading || sending}
-                className="h-9 w-9 shrink-0 rounded-full text-ink-400/70 grid place-items-center hover:text-ink-600 hover:bg-ink-100/60 disabled:opacity-40 transition-colors"
+                className="h-10 w-5 shrink-0 grid place-items-center text-[19px] leading-none font-light text-ink-300 hover:text-ink-500 disabled:opacity-30 transition-colors"
                 aria-label="Attach image"
                 title="Attach image"
               >
-                <ImagePlus className="h-[17px] w-[17px]" strokeWidth={1.8} />
+                +
               </button>
 
               <textarea
